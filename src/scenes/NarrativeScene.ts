@@ -3,13 +3,14 @@
  * `lore[]` del `LevelConfig` activo (texto ≤ 40 palabras por panel, fondo
  * procedural por viñeta, avance por tap, «Saltar»).
  *
- * PLACEHOLDER (Etapa 0): escena vacía; se implementa en la Etapa 3.
+ * PLACEHOLDER: escena vacía; se implementa en la Etapa 3.
  */
 import Phaser from 'phaser';
+import { SceneKey } from '../config/sceneKeys';
 
 export class NarrativeScene extends Phaser.Scene {
   constructor() {
-    super('NarrativeScene');
+    super(SceneKey.NARRATIVE);
   }
 
   create(): void {}

@@ -3,13 +3,18 @@
  * nivel activo. Nivel 1: callejón con parallax de niebla y la niña como
  * objetivo errático; meta 3 taps, timer 45 s; timeout → GAME_OVER.
  *
- * PLACEHOLDER (Etapa 0): escena vacía; se implementa en la Etapa 4.
+ * NOTA: GAME_OVER (la 8ª clave del flujo, SPEC §3) es un OVERLAY dibujado
+ * DENTRO de esta escena («La niebla lo ocultó todo… ¡inténtalo de nuevo!» +
+ * «Reintentar»), no una escena con archivo propio (SPEC §10.2).
+ *
+ * PLACEHOLDER: escena vacía; se implementa en la Etapa 4.
  */
 import Phaser from 'phaser';
+import { SceneKey } from '../config/sceneKeys';
 
 export class ActionScene extends Phaser.Scene {
   constructor() {
-    super('ActionScene');
+    super(SceneKey.ACTION);
   }
 
   create(): void {}

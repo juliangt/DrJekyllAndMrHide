@@ -1,0 +1,356 @@
+/**
+ * Etapa 1 — test del AudioSystem (SPEC §8) con un AudioContext FAKE que
+ * graba todas las llamadas a las APIs de síntesis (jsdom no tiene
+ * AudioContext real). Se valida: contexto lazy hasta unlock, unlock
+ * idempotente, mute ⇒ NINGUNA fuente de sonido + persistencia vía save, y
+ * que blip/thump/noise usan osciladores/ruido con envolventes.
+ */
+import { describe, expect, it } from 'vitest';
+import {
+  AudioSystem,
+  type AudioBufferLike,
+  type AudioBufferSourceNodeLike,
+  type AudioContextLike,
+  type AudioSaveStore,
+  type GainNodeLike,
+  type OscillatorNodeLike,
+} from '../systems/AudioSystem';
+
+// ---- Fakes estructurales ------------------------------------------------
+
+class FakeParam {
+  value = 0;
+  readonly setValueAtTimeCalls: Array<[number, number]> = [];
+  readonly linearRampCalls: Array<[number, number]> = [];
+  readonly exponentialRampCalls: Array<[number, number]> = [];
+  setValueAtTime(value: number, startTime: number): void {
+    this.setValueAtTimeCalls.push([value, startTime]);
+    this.value = value;
+  }
+  linearRampToValueAtTime(value: number, endTime: number): void {
+    this.linearRampCalls.push([value, endTime]);
+  }
+  exponentialRampToValueAtTime(value: number, endTime: number): void {
+    this.exponentialRampCalls.push([value, endTime]);
+  }
+}
+
+class FakeOscillator implements OscillatorNodeLike {
+  type = '';
+  readonly frequency = new FakeParam();
+  readonly connectCalls: unknown[] = [];
+  startedAt: number | undefined;
+  stoppedAt: number | undefined;
+  connect(node: unknown): unknown {
+    this.connectCalls.push(node);
+    return node;
+  }
+  start(when?: number): void {
+    this.startedAt = when;
+  }
+  stop(when?: number): void {
+    this.stoppedAt = when;
+  }
+}
+
+class FakeGain implements GainNodeLike {
+  readonly gain = new FakeParam();
+  readonly connectCalls: unknown[] = [];
+  connect(node: unknown): unknown {
+    this.connectCalls.push(node);
+    return node;
+  }
+}
+
+class FakeBuffer implements AudioBufferLike {
+  readonly data: Float32Array;
+  channels = 1;
+  bufferSampleRate = 44100;
+  constructor(length: number) {
+    this.data = new Float32Array(length);
+  }
+  getChannelData(channel: number): Float32Array {
+    expect(channel).toBe(0);
+    return this.data;
+  }
+}
+
+class FakeBufferSource implements AudioBufferSourceNodeLike {
+  buffer: AudioBufferLike | null = null;
+  readonly connectCalls: unknown[] = [];
+  startedAt: number | undefined;
+  stoppedAt: number | undefined;
+  connect(node: unknown): unknown {
+    this.connectCalls.push(node);
+    return node;
+  }
+  start(when?: number): void {
+    this.startedAt = when;
+  }
+  stop(when?: number): void {
+    this.stoppedAt = when;
+  }
+}
+
+class FakeAudioContext implements AudioContextLike {
+  readonly currentTime = 1.25;
+  readonly sampleRate = 44100;
+  state: string = 'suspended';
+  resumeCalls = 0;
+  resumeShouldReject = false;
+  readonly destination = { id: 'destination' };
+  readonly oscillators: FakeOscillator[] = [];
+  readonly gains: FakeGain[] = [];
+  readonly buffers: FakeBuffer[] = [];
+  readonly sources: FakeBufferSource[] = [];
+
+  resume(): Promise<void> {
+    this.resumeCalls++;
+    if (this.resumeShouldReject) {
+      return Promise.reject(new Error('autoplay blocked'));
+    }
+    this.state = 'running';
+    return Promise.resolve();
+  }
+  createOscillator(): FakeOscillator {
+    const osc = new FakeOscillator();
+    this.oscillators.push(osc);
+    return osc;
+  }
+  createGain(): FakeGain {
+    const gain = new FakeGain();
+    this.gains.push(gain);
+    return gain;
+  }
+  createBuffer(numChannels: number, length: number, sampleRate: number): FakeBuffer {
+    const buffer = new FakeBuffer(length);
+    buffer.channels = numChannels;
+    buffer.bufferSampleRate = sampleRate;
+    this.buffers.push(buffer);
+    return buffer;
+  }
+  createBufferSource(): FakeBufferSource {
+    const source = new FakeBufferSource();
+    this.sources.push(source);
+    return source;
+  }
+}
+
+class FakeSaveStore implements AudioSaveStore {
+  muted = false;
+  readonly setMutedCalls: boolean[] = [];
+  setMuted(muted: boolean): void {
+    this.setMutedCalls.push(muted);
+    this.muted = muted;
+  }
+}
+
+/** Sistema montado con fakes; `created` cuenta llamadas al factory. */
+function makeSystem(): {
+  audio: AudioSystem;
+  ctx: FakeAudioContext;
+  store: FakeSaveStore;
+  created: () => number;
+} {
+  const ctx = new FakeAudioContext();
+  const store = new FakeSaveStore();
+  let created = 0;
+  const audio = new AudioSystem({
+    saveSystem: store,
+    createContext: () => {
+      created++;
+      return ctx;
+    },
+  });
+  return { audio, ctx, store, created: () => created };
+}
+
+describe('AudioSystem — AudioContext lazy', () => {
+  it('no crea el contexto hasta unlock', () => {
+    const { audio, created } = makeSystem();
+    expect(created()).toBe(0);
+    expect(audio.isUnlocked).toBe(false);
+  });
+
+  it('las primitivas son no-ops sin unlock (no crean contexto NI fuentes)', () => {
+    const { audio, ctx, created } = makeSystem();
+    audio.blip();
+    audio.thump();
+    audio.noise();
+    expect(created()).toBe(0);
+    expect(ctx.oscillators.length).toBe(0);
+    expect(ctx.sources.length).toBe(0);
+  });
+
+  it('unlock crea el contexto UNA sola vez (idempotente)', () => {
+    const { audio, created } = makeSystem();
+    audio.unlock();
+    audio.unlock();
+    audio.unlock();
+    expect(created()).toBe(1);
+    expect(audio.isUnlocked).toBe(true);
+  });
+
+  it('unlock reanuda un contexto suspendido; en running no vuelve a llamar resume', () => {
+    const { audio, ctx } = makeSystem();
+    expect(ctx.state).toBe('suspended');
+    audio.unlock();
+    expect(ctx.resumeCalls).toBe(1);
+    expect(ctx.state).toBe('running');
+    audio.unlock();
+    expect(ctx.resumeCalls).toBe(1); // ya running
+  });
+
+  it('un resume rechazado (autoplay aún bloqueado) no rompe', () => {
+    const { audio, ctx } = makeSystem();
+    ctx.resumeShouldReject = true;
+    expect(() => audio.unlock()).not.toThrow();
+    expect(ctx.resumeCalls).toBe(1);
+  });
+});
+
+describe('AudioSystem — mute persistente', () => {
+  it('toggleMute persiste el nuevo estado vía SaveSystem', () => {
+    const { audio, store } = makeSystem();
+    expect(audio.muted).toBe(false);
+    expect(audio.toggleMute()).toBe(true);
+    expect(store.setMutedCalls).toEqual([true]);
+    expect(audio.muted).toBe(true);
+    expect(audio.toggleMute()).toBe(false);
+    expect(store.setMutedCalls).toEqual([true, false]);
+  });
+
+  it('setMuted persiste directamente', () => {
+    const { audio, store } = makeSystem();
+    audio.setMuted(true);
+    expect(store.setMutedCalls).toEqual([true]);
+    expect(audio.muted).toBe(true);
+  });
+
+  it('con mute activo NO se crea ninguna fuente de sonido', () => {
+    const { audio, ctx, created } = makeSystem();
+    audio.unlock(); // el contexto puede existir…
+    expect(created()).toBe(1);
+    audio.setMuted(true);
+    audio.blip();
+    audio.thump();
+    audio.noise();
+    expect(ctx.oscillators.length).toBe(0); // …pero ninguna fuente
+    expect(ctx.gains.length).toBe(0);
+    expect(ctx.buffers.length).toBe(0);
+    expect(ctx.sources.length).toBe(0);
+  });
+
+  it('al desmutear vuelven a crearse fuentes', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.setMuted(true);
+    audio.blip();
+    expect(ctx.oscillators.length).toBe(0);
+    audio.setMuted(false);
+    audio.blip();
+    expect(ctx.oscillators.length).toBe(1);
+  });
+});
+
+describe('AudioSystem — blip (oscilador con pitch descendente)', () => {
+  it('crea UN oscilador con su gain, envolventes y arranca/para', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.blip();
+
+    expect(ctx.oscillators.length).toBe(1);
+    expect(ctx.gains.length).toBe(1);
+    const osc = ctx.oscillators[0];
+    const gain = ctx.gains[0];
+
+    expect(osc.type).toBe('triangle');
+    // Pitch: setValueAtTime inicial + ramp exponencial descendente.
+    expect(osc.frequency.setValueAtTimeCalls[0]).toEqual([880, ctx.currentTime]);
+    expect(osc.frequency.exponentialRampCalls.length).toBe(1);
+    const [toHz, atT] = osc.frequency.exponentialRampCalls[0];
+    expect(toHz).toBeLessThan(880);
+    expect(atT).toBeCloseTo(ctx.currentTime + 0.12, 5);
+    // Envolvente de volumen con caída exponencial (a casi cero).
+    expect(gain.gain.setValueAtTimeCalls.length).toBe(1);
+    expect(gain.gain.exponentialRampCalls.length).toBe(1);
+    expect(gain.gain.exponentialRampCalls[0][0]).toBeLessThanOrEqual(0.001);
+    // Cadena: osc → gain → destination, y start/stop agendados.
+    expect(osc.connectCalls[0]).toBe(gain);
+    expect(gain.connectCalls[0]).toBe(ctx.destination);
+    expect(osc.startedAt).toBe(ctx.currentTime);
+    expect(osc.stoppedAt).toBeCloseTo(ctx.currentTime + 0.12, 5);
+  });
+
+  it('respeta duración y frecuencias personalizadas', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.blip(0.5, 1000, 200);
+    const osc = ctx.oscillators[0];
+    expect(osc.frequency.setValueAtTimeCalls[0]).toEqual([1000, ctx.currentTime]);
+    expect(osc.frequency.exponentialRampCalls[0]).toEqual([200, ctx.currentTime + 0.5]);
+    expect(osc.stoppedAt).toBeCloseTo(ctx.currentTime + 0.5, 5);
+  });
+});
+
+describe('AudioSystem — thump (grave con decay)', () => {
+  it('crea un oscilador grave que baja de frecuencia', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.thump();
+
+    expect(ctx.oscillators.length).toBe(1);
+    const osc = ctx.oscillators[0];
+    const gain = ctx.gains[0];
+
+    expect(osc.type).toBe('sine');
+    const [fromHz] = osc.frequency.setValueAtTimeCalls[0];
+    const [toHz] = osc.frequency.exponentialRampCalls[0];
+    expect(fromHz).toBeLessThanOrEqual(160);
+    expect(toHz).toBeLessThan(fromHz);
+    expect(osc.connectCalls[0]).toBe(gain);
+    expect(gain.connectCalls[0]).toBe(ctx.destination);
+    expect(osc.startedAt).toBe(ctx.currentTime);
+    expect(osc.stoppedAt).toBeGreaterThan(ctx.currentTime);
+  });
+});
+
+describe('AudioSystem — noise (ruido blanco breve)', () => {
+  it('crea buffer + fuente de ruido con envolvente y lo agenda', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.noise();
+
+    expect(ctx.buffers.length).toBe(1);
+    expect(ctx.sources.length).toBe(1);
+    const buffer = ctx.buffers[0];
+    const source = ctx.sources[0];
+    const gain = ctx.gains[0];
+
+    // Buffer mono con la duración pedida (0.15 s a 44100 Hz).
+    expect(buffer.channels).toBe(1);
+    expect(buffer.data.length).toBe(Math.floor(0.15 * ctx.sampleRate));
+    expect(buffer.bufferSampleRate).toBe(ctx.sampleRate);
+    // El ruido está efectivamente escrito (muestras no nulas, rango [-1, 1]).
+    const nonZero = buffer.data.filter((sample) => sample !== 0).length;
+    expect(nonZero).toBeGreaterThan(buffer.data.length / 2);
+    for (const sample of buffer.data) {
+      expect(Math.abs(sample)).toBeLessThanOrEqual(1);
+    }
+    // Fuente conectada al buffer, a la cadena, y agendada.
+    expect(source.buffer).toBe(buffer);
+    expect(source.connectCalls[0]).toBe(gain);
+    expect(gain.connectCalls[0]).toBe(ctx.destination);
+    expect(gain.gain.exponentialRampCalls.length).toBe(1);
+    expect(source.startedAt).toBe(ctx.currentTime);
+    expect(source.stoppedAt).toBeCloseTo(ctx.currentTime + 0.15, 5);
+  });
+
+  it('respeta la duración personalizada', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.noise(0.5);
+    expect(ctx.buffers[0].data.length).toBe(Math.floor(0.5 * ctx.sampleRate));
+    expect(ctx.sources[0].stoppedAt).toBeCloseTo(ctx.currentTime + 0.5, 5);
+  });
+});
