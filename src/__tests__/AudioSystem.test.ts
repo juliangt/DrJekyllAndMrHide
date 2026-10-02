@@ -12,6 +12,7 @@ import {
   type AudioBufferSourceNodeLike,
   type AudioContextLike,
   type AudioSaveStore,
+  type BiquadFilterNodeLike,
   type GainNodeLike,
   type OscillatorNodeLike,
 } from '../systems/AudioSystem';
@@ -92,6 +93,16 @@ class FakeBufferSource implements AudioBufferSourceNodeLike {
   }
 }
 
+class FakeBiquadFilter implements BiquadFilterNodeLike {
+  type = '';
+  readonly frequency = new FakeParam();
+  readonly connectCalls: unknown[] = [];
+  connect(node: unknown): unknown {
+    this.connectCalls.push(node);
+    return node;
+  }
+}
+
 class FakeAudioContext implements AudioContextLike {
   readonly currentTime = 1.25;
   readonly sampleRate = 44100;
@@ -103,6 +114,7 @@ class FakeAudioContext implements AudioContextLike {
   readonly gains: FakeGain[] = [];
   readonly buffers: FakeBuffer[] = [];
   readonly sources: FakeBufferSource[] = [];
+  readonly filters: FakeBiquadFilter[] = [];
 
   resume(): Promise<void> {
     this.resumeCalls++;
@@ -133,6 +145,11 @@ class FakeAudioContext implements AudioContextLike {
     const source = new FakeBufferSource();
     this.sources.push(source);
     return source;
+  }
+  createBiquadFilter(): FakeBiquadFilter {
+    const filter = new FakeBiquadFilter();
+    this.filters.push(filter);
+    return filter;
   }
 }
 
@@ -352,5 +369,78 @@ describe('AudioSystem — noise (ruido blanco breve)', () => {
     audio.noise(0.5);
     expect(ctx.buffers[0].data.length).toBe(Math.floor(0.5 * ctx.sampleRate));
     expect(ctx.sources[0].stoppedAt).toBeCloseTo(ctx.currentTime + 0.5, 5);
+  });
+});
+
+describe('AudioSystem — wind (sweep de ruido filtrado low-pass, SPEC §8)', () => {
+  it('sin unlock es no-op: no crea buffer, fuente NI filtro', () => {
+    const { audio, ctx, created } = makeSystem();
+    audio.wind();
+    expect(created()).toBe(0);
+    expect(ctx.buffers.length).toBe(0);
+    expect(ctx.sources.length).toBe(0);
+    expect(ctx.filters.length).toBe(0);
+  });
+
+  it('con mute activo no crea ninguna fuente de sonido', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.setMuted(true);
+    audio.wind();
+    expect(ctx.buffers.length).toBe(0);
+    expect(ctx.filters.length).toBe(0);
+    expect(ctx.gains.length).toBe(0);
+  });
+
+  it('crea ruido → filtro lowpass con sweep → gain → destination', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.wind();
+
+    expect(ctx.buffers.length).toBe(1);
+    const buffer = ctx.buffers[0];
+    const source = ctx.sources[0];
+    const filter = ctx.filters[0];
+    const gain = ctx.gains[0];
+
+    // Buffer de ruido de la duración por defecto (2.4 s).
+    expect(buffer.channels).toBe(1);
+    expect(buffer.data.length).toBe(Math.floor(2.4 * ctx.sampleRate));
+    const nonZero = buffer.data.filter((sample) => sample !== 0).length;
+    expect(nonZero).toBeGreaterThan(buffer.data.length / 2);
+    expect(source.buffer).toBe(buffer);
+
+    // Filtro low-pass con barrido de frecuencia (ráfaga que sube y baja).
+    expect(filter.type).toBe('lowpass');
+    expect(filter.frequency.setValueAtTimeCalls.length).toBe(1);
+    expect(filter.frequency.exponentialRampCalls.length).toBe(2);
+    const [startHz] = filter.frequency.setValueAtTimeCalls[0];
+    const [peakHz] = filter.frequency.exponentialRampCalls[0];
+    const [endHz] = filter.frequency.exponentialRampCalls[1];
+    expect(peakHz).toBeGreaterThan(startHz);
+    expect(endHz).toBeLessThan(peakHz);
+
+    // Cadena: source → filter → gain → destination, agendada.
+    expect(source.connectCalls[0]).toBe(filter);
+    expect(filter.connectCalls[0]).toBe(gain);
+    expect(gain.connectCalls[0]).toBe(ctx.destination);
+    // Envolvente en swell: ataque lineal + caída exponencial.
+    expect(gain.gain.linearRampCalls.length).toBe(1);
+    expect(gain.gain.exponentialRampCalls.length).toBe(1);
+    expect(source.startedAt).toBe(ctx.currentTime);
+    expect(source.stoppedAt).toBeCloseTo(ctx.currentTime + 2.4, 5);
+  });
+
+  it('respeta duración y frecuencias personalizadas', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.wind(1, 200, 800, 100);
+    const filter = ctx.filters[0];
+    expect(filter.frequency.setValueAtTimeCalls[0]).toEqual([200, ctx.currentTime]);
+    expect(filter.frequency.exponentialRampCalls[0]).toEqual([
+      800,
+      ctx.currentTime + 0.6,
+    ]);
+    expect(ctx.sources[0].stoppedAt).toBeCloseTo(ctx.currentTime + 1, 5);
   });
 });

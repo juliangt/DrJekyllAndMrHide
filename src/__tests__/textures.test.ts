@@ -56,8 +56,8 @@ function makeRecordingGraphics(): { g: Parameters<TextureDef['draw']>[0]; calls:
 const PALETTE_NUMBERS = new Set<number>(Object.values(PALETTE).map((hex) => hexToNumber(hex)));
 
 describe('TEXTURE_DEFS — invariants del registro', () => {
-  it('tiene las 5 texturas de la primera hornada', () => {
-    expect(TEXTURE_DEFS.length).toBe(5);
+  it('tiene las 10 texturas (hornadas 1 + 2)', () => {
+    expect(TEXTURE_DEFS.length).toBe(10);
   });
 
   it('claves únicas', () => {
@@ -86,7 +86,7 @@ describe('TEXTURE_DEFS — invariants del registro', () => {
 
   it('la 1ª hornada completa: niebla, edificio, farola, puff y pergamino', () => {
     const keys = TEXTURE_DEFS.map((def) => def.key);
-    expect(keys).toEqual([
+    expect(keys.slice(0, 5)).toEqual([
       TEXTURE_KEYS.fog,
       TEXTURE_KEYS.building,
       TEXTURE_KEYS.lampPost,
@@ -98,6 +98,22 @@ describe('TEXTURE_DEFS — invariants del registro', () => {
     expect(TEXTURE_KEYS.lampPost).toBe('lamp-post');
     expect(TEXTURE_KEYS.fogPuff).toBe('fog-puff');
     expect(TEXTURE_KEYS.parchmentFrame).toBe('parchment-frame');
+  });
+
+  it('la 2ª hornada (Etapa 2): iconos del «Cómo jugar» y altavoces', () => {
+    const keys = TEXTURE_DEFS.map((def) => def.key);
+    expect(keys.slice(5)).toEqual([
+      TEXTURE_KEYS.iconBook,
+      TEXTURE_KEYS.iconTap,
+      TEXTURE_KEYS.iconQuestion,
+      TEXTURE_KEYS.speakerOn,
+      TEXTURE_KEYS.speakerOff,
+    ]);
+    expect(TEXTURE_KEYS.iconBook).toBe('icon-book');
+    expect(TEXTURE_KEYS.iconTap).toBe('icon-tap');
+    expect(TEXTURE_KEYS.iconQuestion).toBe('icon-question');
+    expect(TEXTURE_KEYS.speakerOn).toBe('speaker-on');
+    expect(TEXTURE_KEYS.speakerOff).toBe('speaker-off');
   });
 });
 
@@ -186,5 +202,62 @@ describe('TEXTURE_DEFS — dibujos con Graphics de grabación', () => {
     const { g, calls } = makeRecordingGraphics();
     frameDef?.draw(g);
     expect(calls.filter((c) => c.method === 'strokeRoundedRect').length).toBe(2);
+  });
+
+  it('el icono del libro tiene tapa/páginas y marcador verde', () => {
+    const def = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.iconBook);
+    expect(def).toBeDefined();
+    const { g, calls } = makeRecordingGraphics();
+    def?.draw(g);
+    expect(calls.some((c) => c.method === 'fillRoundedRect')).toBe(true);
+    expect(calls.filter((c) => c.method === 'fillRect').length).toBeGreaterThanOrEqual(8);
+    expect(
+      calls.some((c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.labGreen)),
+    ).toBe(true);
+  });
+
+  it('el icono del toque tiene diana (strokeCircle) y destellos', () => {
+    const def = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.iconTap);
+    expect(def).toBeDefined();
+    const { g, calls } = makeRecordingGraphics();
+    def?.draw(g);
+    expect(calls.filter((c) => c.method === 'strokeCircle').length).toBeGreaterThanOrEqual(2);
+    expect(calls.some((c) => c.method === 'fillTriangle')).toBe(true);
+  });
+
+  it('el icono del quiz: carta pergamino + «?» de 6 bloques púrpura', () => {
+    const def = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.iconQuestion);
+    expect(def).toBeDefined();
+    const { g, calls } = makeRecordingGraphics();
+    def?.draw(g);
+    expect(calls.some((c) => c.method === 'fillRoundedRect')).toBe(true);
+    expect(calls.some((c) => c.method === 'strokeRoundedRect')).toBe(true);
+    // La carta se dibuja con fillRoundedRect: TODO fillRect del dibujo es
+    // el «?» en bloques (6: barra, columnas, codo, tallo y punto).
+    expect(calls.filter((c) => c.method === 'fillRect').length).toBe(6);
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.potionPurple),
+      ),
+    ).toBe(true);
+  });
+
+  it('speaker-on: tres ondas concéntricas; speaker-off: aspa roja con strokePath', () => {
+    const on = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.speakerOn);
+    const off = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.speakerOff);
+    expect(on).toBeDefined();
+    expect(off).toBeDefined();
+    const recOn = makeRecordingGraphics();
+    on?.draw(recOn.g);
+    expect(recOn.calls.filter((c) => c.method === 'strokeCircle').length).toBe(3);
+    const recOff = makeRecordingGraphics();
+    off?.draw(recOff.g);
+    expect(recOff.calls.some((c) => c.method === 'strokePath')).toBe(true);
+    // El aspa usa el rojo desaturado de la paleta (feedback, SPEC §7.1).
+    expect(
+      recOff.calls.some(
+        (c) => c.method === 'lineStyle' && c.args[1] === hexToNumber(PALETTE.error),
+      ),
+    ).toBe(true);
   });
 });

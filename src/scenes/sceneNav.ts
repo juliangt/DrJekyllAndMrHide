@@ -60,9 +60,25 @@ export const FADE_DURATION_MS = 400;
 const FADE_OUT_COMPLETE = 'camerafadeoutcomplete';
 
 /**
+ * Guard de reentrada de `transitionTo` (deuda anotada por la etapa
+ * anterior): handler de fade PENDIENTE por escena. Si `transitionTo` se
+ * llama dos veces (p. ej. doble tap rápido en un botón), el handler de la
+ * primera llamada se retira de la cámara antes de registrar el nuevo —
+ * sin este guard, dos `once` vivos dispararían `scene.start` DOS veces.
+ *
+ * Nota: el emitter de Phaser (eventemitter3) guarda la referencia ORIGINAL
+ * del listener, así que `cam.off(event, fn)` sí da de baja un `once`.
+ */
+const pendingFadeHandlers = new WeakMap<Phaser.Scene, () => void>();
+
+/**
  * Transición estándar entre escenas: fade OUT con el color de noche →
  * `scene.start(key, data)` al completarse el fade → la escena destino hace
  * su propio fade IN en `create()` (helper `fadeIn`).
+ *
+ * Reentrante: llamadas repetidas mientras un fade está pendiente RETIRAN
+ * el listener anterior (gana la última llamada; `scene.start` se ejecuta
+ * una sola vez).
  *
  * Los RGB del fade se derivan de `nightBackground` para que la transición
  * sea literalmente «la niebla se traga la pantalla».
@@ -75,9 +91,17 @@ export function transitionTo(
 ): void {
   const { r, g, b } = hexToRgb(nightBackground);
   const cam = scene.cameras.main;
-  cam.once(FADE_OUT_COMPLETE, () => {
+  const previous = pendingFadeHandlers.get(scene);
+  if (previous) {
+    cam.off(FADE_OUT_COMPLETE, previous);
+    pendingFadeHandlers.delete(scene);
+  }
+  const handler = (): void => {
+    pendingFadeHandlers.delete(scene);
     scene.scene.start(key, data);
-  });
+  };
+  pendingFadeHandlers.set(scene, handler);
+  cam.once(FADE_OUT_COMPLETE, handler);
   cam.fadeOut(durationMs, r, g, b);
 }
 

@@ -20,12 +20,16 @@
 import type Phaser from 'phaser';
 import {
   buildings,
+  error,
   fogMid,
   fogNear,
   hexToNumber,
+  labGreen,
   lampFire,
   parchmentDark,
   parchmentLight,
+  potionPurple,
+  textPrimary,
 } from '../config/palette';
 
 /** Definición de una textura procedural (datos puros + función de dibujo). */
@@ -54,6 +58,16 @@ export const TEXTURE_KEYS = {
   fogPuff: 'fog-puff',
   /** Marco pergamino: rectángulo redondeado + borde doble sepia (UI/quiz). */
   parchmentFrame: 'parchment-frame',
+  /** Icono «Cómo jugar» paso 1: leer la viñeta (libro abierto). */
+  iconBook: 'icon-book',
+  /** Icono «Cómo jugar» paso 2: tocar al objetivo (dedo + diana). */
+  iconTap: 'icon-tap',
+  /** Icono «Cómo jugar» paso 3: responder el quiz (carta con «?»). */
+  iconQuestion: 'icon-question',
+  /** Altavoz con ondas: sonido activado (toggle de mute, SPEC §8). */
+  speakerOn: 'speaker-on',
+  /** Altavoz con X: silencio (toggle de mute, SPEC §8). */
+  speakerOff: 'speaker-off',
 } as const;
 
 /**
@@ -163,8 +177,121 @@ function drawParchmentFrame(g: Phaser.GameObjects.Graphics): void {
   g.fillRect(34, 34, 444, 22);
 }
 
+// ---- Iconos de la Etapa 2 («Cómo jugar» + toggle de mute, SPEC §6/§8) --------
+
+/** Libro abierto: paso 1 del «Cómo jugar» (leer la viñeta). */
+function drawIconBook(g: Phaser.GameObjects.Graphics): void {
+  const cover = hexToNumber(parchmentDark);
+  const page = hexToNumber(parchmentLight);
+  const ink = hexToNumber(parchmentDark);
+  const ribbon = hexToNumber(labGreen);
+  // Tapa oscura asomando por detrás de las páginas.
+  g.fillStyle(cover, 1);
+  g.fillRoundedRect(14, 34, 100, 64, 6);
+  // Páginas izquierda y derecha.
+  g.fillStyle(page, 1);
+  g.fillRect(22, 40, 40, 52);
+  g.fillRect(66, 40, 40, 52);
+  // Lomo central.
+  g.fillStyle(cover, 1);
+  g.fillRect(62, 38, 4, 58);
+  // Líneas de texto sugeridas (trazos finos sobre el pergamino).
+  g.fillStyle(ink, 0.45);
+  g.fillRect(28, 48, 28, 3);
+  g.fillRect(28, 58, 28, 3);
+  g.fillRect(28, 68, 20, 3);
+  g.fillRect(72, 48, 28, 3);
+  g.fillRect(72, 58, 24, 3);
+  g.fillRect(72, 68, 28, 3);
+  // Marcador verde colgando en la página derecha.
+  g.fillStyle(ribbon, 1);
+  g.fillRect(88, 28, 10, 22);
+  g.fillTriangle(88, 50, 98, 50, 93, 58);
+}
+
+/** Dedo tocando una diana: paso 2 del «Cómo jugar» (tocar al objetivo). */
+function drawIconTap(g: Phaser.GameObjects.Graphics): void {
+  const finger = hexToNumber(textPrimary);
+  const ring = hexToNumber(lampFire);
+  // Diana: anillo exterior + eco interior.
+  g.lineStyle(6, ring, 0.9);
+  g.strokeCircle(64, 76, 34);
+  g.lineStyle(4, ring, 0.45);
+  g.strokeCircle(64, 76, 20);
+  // Dedo (silueta clara): punta, cuerpo y nudillos.
+  g.fillStyle(finger, 1);
+  g.fillCircle(64, 44, 9);
+  g.fillRect(58, 44, 12, 48);
+  g.fillRect(46, 92, 36, 22);
+  // Destellos del toque (tres chevrones de fuego alrededor de la punta).
+  g.fillStyle(ring, 0.95);
+  g.fillTriangle(64, 10, 57, 20, 71, 20);
+  g.fillTriangle(26, 28, 20, 40, 34, 36);
+  g.fillTriangle(102, 28, 108, 40, 94, 36);
+}
+
+/** Carta pergamino con «?» en púrpura: paso 3 del «Cómo jugar» (quiz). */
+function drawIconQuestion(g: Phaser.GameObjects.Graphics): void {
+  const page = hexToNumber(parchmentLight);
+  const dark = hexToNumber(parchmentDark);
+  const mark = hexToNumber(potionPurple);
+  // Carta con borde.
+  g.fillStyle(page, 1);
+  g.fillRoundedRect(20, 16, 88, 96, 12);
+  g.lineStyle(5, dark, 1);
+  g.strokeRoundedRect(20, 16, 88, 96, 12);
+  // «?» en bloques (determinista, sin fuente): barra, columnas, codo,
+  // tallo y punto.
+  g.fillStyle(mark, 1);
+  g.fillRect(50, 32, 28, 10); // barra superior
+  g.fillRect(44, 40, 10, 20); // columna izquierda
+  g.fillRect(72, 40, 10, 28); // columna derecha (más larga)
+  g.fillRect(56, 62, 20, 10); // codo hacia el centro
+  g.fillRect(58, 70, 10, 18); // tallo
+  g.fillRect(56, 92, 16, 12); // punto
+}
+
+/** Caja + cono del altavoz (compartida por speaker-on / speaker-off). */
+function drawSpeakerCone(g: Phaser.GameObjects.Graphics): void {
+  const body = hexToNumber(textPrimary);
+  // Caja del altavoz.
+  g.fillStyle(body, 1);
+  g.fillRect(12, 38, 14, 24);
+  // Cono (trapecio hacia la derecha, dos triángulos).
+  g.fillTriangle(26, 34, 26, 62, 52, 72);
+  g.fillTriangle(26, 34, 52, 72, 52, 26);
+}
+
+/** Altavoz con ondas de sonido: sonido ACTIVADO (toggle de mute). */
+function drawSpeakerOn(g: Phaser.GameObjects.Graphics): void {
+  const wave = hexToNumber(textPrimary);
+  drawSpeakerCone(g);
+  // Tres frentes de onda concéntricos, cada vez más tenues.
+  g.lineStyle(5, wave, 0.85);
+  g.strokeCircle(54, 48, 14);
+  g.lineStyle(5, wave, 0.45);
+  g.strokeCircle(54, 48, 26);
+  g.lineStyle(5, wave, 0.2);
+  g.strokeCircle(54, 48, 38);
+}
+
+/** Altavoz con aspa roja desaturada: SILENCIO (toggle de mute). */
+function drawSpeakerOff(g: Phaser.GameObjects.Graphics): void {
+  const cross = hexToNumber(error);
+  drawSpeakerCone(g);
+  // Aspa (dos trazos diagonales gruesos).
+  g.lineStyle(7, cross, 0.95);
+  g.beginPath();
+  g.moveTo(52, 34);
+  g.lineTo(84, 62);
+  g.moveTo(84, 34);
+  g.lineTo(52, 62);
+  g.strokePath();
+}
+
 /**
- * Primera hornada de texturas (PLAN Etapa 1). Hornadas futuras (niña, Hyde,
+ * Registro de texturas: primera hornada (PLAN Etapa 1) + iconos de la
+ * Etapa 2 («Cómo jugar» y toggle de mute). Hornadas futuras (niña, Hyde,
  * adoquines, sello de cera…) se añaden aquí o en registros posteriores.
  */
 export const TEXTURE_DEFS: readonly TextureDef[] = [
@@ -202,6 +329,41 @@ export const TEXTURE_DEFS: readonly TextureDef[] = [
     height: 512,
     description: 'Marco pergamino con borde doble sepia (paneles de UI y quiz).',
     draw: drawParchmentFrame,
+  },
+  {
+    key: TEXTURE_KEYS.iconBook,
+    width: 128,
+    height: 128,
+    description: 'Libro abierto: paso 1 del «Cómo jugar» (leer la viñeta).',
+    draw: drawIconBook,
+  },
+  {
+    key: TEXTURE_KEYS.iconTap,
+    width: 128,
+    height: 128,
+    description: 'Dedo sobre una diana: paso 2 del «Cómo jugar» (tocar al objetivo).',
+    draw: drawIconTap,
+  },
+  {
+    key: TEXTURE_KEYS.iconQuestion,
+    width: 128,
+    height: 128,
+    description: 'Carta pergamino con «?»: paso 3 del «Cómo jugar» (responder el quiz).',
+    draw: drawIconQuestion,
+  },
+  {
+    key: TEXTURE_KEYS.speakerOn,
+    width: 96,
+    height: 96,
+    description: 'Altavoz con ondas: sonido activado (toggle de mute del menú).',
+    draw: drawSpeakerOn,
+  },
+  {
+    key: TEXTURE_KEYS.speakerOff,
+    width: 96,
+    height: 96,
+    description: 'Altavoz con aspa: silencio (toggle de mute del menú).',
+    draw: drawSpeakerOff,
   },
 ];
 
