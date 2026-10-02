@@ -1,0 +1,15 @@
+/*
+ * Etapa 0 — estilos mínimos del host (SPEC §9):
+ * fondo de noche #0d0f14 a pantalla completa y sin scroll; el canvas Phaser
+ * se centra dentro del viewport vía Scale.CENTER_BOTH. Toda la UI del juego
+ * vive dentro del canvas (decisión D2), así que aquí no hay más estilos.
+ */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  background-color: #0d0f14;
+  overflow: hidden;
+}
