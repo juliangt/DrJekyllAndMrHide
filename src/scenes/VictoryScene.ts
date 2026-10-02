@@ -3,13 +3,14 @@
  * con felicitación por haber leído la obra, desglose de puntaje
  * (taps + quiz + bonus), input opcional de nombre y botones de cierre.
  *
- * PLACEHOLDER (Etapa 0): escena vacía; se implementa en la Etapa 6.
+ * PLACEHOLDER: escena vacía; se implementa en la Etapa 6.
  */
 import Phaser from 'phaser';
+import { SceneKey } from '../config/sceneKeys';
 
 export class VictoryScene extends Phaser.Scene {
   constructor() {
-    super('VictoryScene');
+    super(SceneKey.VICTORY);
   }
 
   create(): void {}
