@@ -48,6 +48,13 @@ export interface AudioBufferSourceNodeLike {
   stop(when?: number): void;
 }
 
+/** Envoltura de un filtro biquadratic (subset de `BiquadFilterNode`). */
+export interface BiquadFilterNodeLike {
+  type: string;
+  frequency: ParamLike;
+  connect(node: unknown): unknown;
+}
+
 export interface AudioContextLike {
   readonly currentTime: number;
   readonly sampleRate: number;
@@ -58,6 +65,7 @@ export interface AudioContextLike {
   createGain(): GainNodeLike;
   createBuffer(numChannels: number, length: number, sampleRate: number): AudioBufferLike;
   createBufferSource(): AudioBufferSourceNodeLike;
+  createBiquadFilter(): BiquadFilterNodeLike;
 }
 
 /** Lo que AudioSystem necesita del SaveSystem (muted + persistencia). */
@@ -178,6 +186,47 @@ export class AudioSystem {
     gain.gain.setValueAtTime(MASTER_GAIN * 0.8, t0);
     gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durationSec);
     source.connect(gain);
+    gain.connect(ctx.destination);
+    source.start(t0);
+    source.stop(t0 + durationSec);
+  }
+
+  /**
+   * Viento (SPEC §8 «sweep de ruido filtrado»): ruido blanco → filtro
+   * low-pass cuyo corte SUBE hasta un pico y vuelve a bajar (ráfaga que se
+   * acerca y se va) + envolvente de volumen en swell. Se usa al entrar al
+   * menú y en las transiciones de escena.
+   */
+  wind(
+    durationSec = 2.4,
+    fromHz = 260,
+    peakHz = 1100,
+    toHz = 320,
+  ): void {
+    const ctx = this.playableContext();
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const length = Math.max(1, Math.floor(durationSec * ctx.sampleRate));
+    const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+    const samples = buffer.getChannelData(0);
+    for (let i = 0; i < samples.length; i++) {
+      samples[i] = Math.random() * 2 - 1;
+    }
+    const source = ctx.createBufferSource();
+    source.buffer = buffer;
+    // Low-pass: el corte barre fromHz → peakHz (60 %) → toHz (ráfaga).
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(fromHz, t0);
+    filter.frequency.exponentialRampToValueAtTime(peakHz, t0 + durationSec * 0.6);
+    filter.frequency.exponentialRampToValueAtTime(Math.max(toHz, 1), t0 + durationSec);
+    // Envolvente: ataque suave, cuerpo y caída exponencial (nunca click).
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.linearRampToValueAtTime(MASTER_GAIN * 0.5, t0 + durationSec * 0.35);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durationSec);
+    source.connect(filter);
+    filter.connect(gain);
     gain.connect(ctx.destination);
     source.start(t0);
     source.stop(t0 + durationSec);

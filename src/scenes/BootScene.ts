@@ -18,6 +18,7 @@ import { transitionTo } from './sceneNav';
 import { AudioSystem } from '../systems/AudioSystem';
 import { SaveSystem } from '../systems/SaveSystem';
 import { ScoreSystem } from '../systems/ScoreSystem';
+import { SYSTEM_KEYS } from '../systems/getSystems';
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -36,9 +37,9 @@ export class BootScene extends Phaser.Scene {
       createContext: (): AudioContext => new AudioContext(),
     });
     const scoreSystem = new ScoreSystem();
-    this.registry.set('saveSystem', saveSystem);
-    this.registry.set('audioSystem', audioSystem);
-    this.registry.set('scoreSystem', scoreSystem);
+    this.registry.set(SYSTEM_KEYS.saveSystem, saveSystem);
+    this.registry.set(SYSTEM_KEYS.audioSystem, audioSystem);
+    this.registry.set(SYSTEM_KEYS.scoreSystem, scoreSystem);
 
     // Primer gesto → AudioContext (políticas de autoplay, SPEC §8).
     const unlockAudio = (): void => {
