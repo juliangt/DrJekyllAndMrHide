@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <!-- Viewport mobile-first (SPEC §9): sin zoom de usuario, canvas a viewport completo -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+    <!--
+      Tipografías (SPEC §7.3): UnifrakturCook (títulos góticos legibles),
+      Special Elite (typewriter, textos de época/UI) y Crimson Text (bloques
+      largos). Fallback: Georgia, serif. La espera activa (FontFace.load) se
+      hace en PRELOAD a partir de la Etapa 1.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=UnifrakturCook:wght@700&family=Special+Elite&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap"
+      rel="stylesheet"
+    />
+    <title>Jekyll &amp; Hyde [TBD]</title>
+  </head>
+  <body>
+    <!-- Toda la UI del juego vive dentro del canvas Phaser (SPEC §10.1, D2).
+         Phaser añade el canvas al body desde src/main.ts. -->
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
