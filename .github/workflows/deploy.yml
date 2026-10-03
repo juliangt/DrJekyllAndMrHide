@@ -1,12 +1,10 @@
 # Deploy estático a GitHub Pages (SPEC §10.1).
-# En cada push a main: build con Vite (base './' para funcionar bajo subpath)
-# y publicación del directorio dist/. También manual desde Actions.
+# Solo manual (pestaña Actions → Deploy to GitHub Pages → Run workflow):
+# build con Vite (base './' para funcionar bajo subpath) y publicación de dist/.
 # Requiere Pages habilitado con build_type=workflow (Settings → Pages).
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -14,7 +12,7 @@ permissions:
   pages: write
   id-token: write
 
-# Un solo deploy a la vez; los pushes nuevos cancelan el anterior.
+# Un solo deploy a la vez.
 concurrency:
   group: pages
   cancel-in-progress: true
