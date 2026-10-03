@@ -278,6 +278,58 @@ export class AudioSystem {
   }
 
   /**
+   * Arpegio mayor breve (SPEC §8 «Acierto quiz: arpegio mayor breve, 2–3
+   * notas»): tres notas de la tríada mayor de do (C5–E5–G5, 0/4/7 semitonos
+   * en temperamento igual) encadenadas a ~90 ms, timbre triangular cálido
+   * con decay exponencial por nota — el «premio» sonoro del quiz correcto.
+   */
+  arpeggio(noteSec = 0.24, stepSec = 0.09, baseHz = 523.25): void {
+    const ctx = this.playableContext();
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const semitones = [0, 4, 7]; // tríada mayor: fundamental, 3ª, 5ª
+    for (const [i, semi] of semitones.entries()) {
+      const start = t0 + i * stepSec;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(baseHz * Math.pow(2, semi / 12), start);
+      gain.gain.setValueAtTime(MASTER_GAIN * 0.9, start);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + noteSec);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + noteSec);
+    }
+  }
+
+  /**
+   * Error del quiz (SPEC §8 «Error quiz: intervalo menor descendente,
+   * suave»): dos notas seno una TERCERA MENOR hacia abajo (la3 → fa♯3,
+   * 440 → 369.99 Hz), la segunda entra un poco después, con volumen
+   * comedido — desaprueba sin castigar (tono amable, SPEC §9).
+   */
+  errorSound(noteSec = 0.3, stepSec = 0.13, fromHz = 440, toHz = 369.99): void {
+    const ctx = this.playableContext();
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const notes = [fromHz, toHz];
+    for (const [i, hz] of notes.entries()) {
+      const start = t0 + i * stepSec;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(hz, start);
+      gain.gain.setValueAtTime(MASTER_GAIN * 0.6, start);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + noteSec);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + noteSec);
+    }
+  }
+
+  /**
    * Contexto válido para sonar: ya desbloqueado Y sin mute. En cualquier
    * otro caso devuelve `null` → la primitiva es no-op SIN crear fuentes.
    */

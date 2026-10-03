@@ -548,3 +548,124 @@ describe('AudioSystem — timeout (tono grave sostenido con decay, SPEC §8/Etap
     expect(ctx.oscillators[0].stoppedAt).toBeCloseTo(ctx.currentTime + 2, 5);
   });
 });
+
+describe('AudioSystem — arpeggio (acierto del quiz, SPEC §8/Etapa 5)', () => {
+  it('sin unlock y con mute es no-op: no crea ninguna fuente de sonido', () => {
+    const a = makeSystem();
+    a.audio.arpeggio();
+    expect(a.created()).toBe(0);
+    expect(a.ctx.oscillators.length).toBe(0);
+
+    const b = makeSystem();
+    b.audio.unlock();
+    b.audio.setMuted(true);
+    b.audio.arpeggio();
+    expect(b.ctx.oscillators.length).toBe(0);
+    expect(b.ctx.gains.length).toBe(0);
+  });
+
+  it('tres notas de la tríada MAYOR (0/4/7 semitonos), encadenadas y con decay', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.arpeggio();
+
+    expect(ctx.oscillators.length).toBe(3);
+    expect(ctx.gains.length).toBe(3);
+
+    const freqs = ctx.oscillators.map((osc) => osc.frequency.setValueAtTimeCalls[0][0]);
+    // Fundamental do5 y relaciones de 3ª mayor y 5ª justa (temperamento igual).
+    expect(freqs[0]).toBeCloseTo(523.25, 1);
+    expect(freqs[1] / freqs[0]).toBeCloseTo(Math.pow(2, 4 / 12), 3);
+    expect(freqs[2] / freqs[0]).toBeCloseTo(Math.pow(2, 7 / 12), 3);
+    expect(freqs[1]).toBeGreaterThan(freqs[0]);
+    expect(freqs[2]).toBeGreaterThan(freqs[1]);
+
+    // Cada nota: triangular, arranca escalonada (0.09 s), decay y agenda.
+    ctx.oscillators.forEach((osc, i) => {
+      expect(osc.type).toBe('triangle');
+      expect(osc.startedAt).toBeCloseTo(ctx.currentTime + i * 0.09, 5);
+      expect(osc.stoppedAt).toBeCloseTo(ctx.currentTime + i * 0.09 + 0.24, 5);
+      // Envolvente: golpe inicial + caída exponencial a casi cero.
+      const gain = ctx.gains[i];
+      expect(gain.gain.setValueAtTimeCalls.length).toBe(1);
+      expect(gain.gain.exponentialRampCalls.length).toBe(1);
+      expect(gain.gain.exponentialRampCalls[0][0]).toBeLessThanOrEqual(0.001);
+      // Cadena: osc → gain → destination.
+      expect(osc.connectCalls[0]).toBe(gain);
+      expect(gain.connectCalls[0]).toBe(ctx.destination);
+    });
+  });
+
+  it('respeta duración, espaciado y fundamental personalizadas', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.arpeggio(0.4, 0.2, 392); // sol4
+
+    const freqs = ctx.oscillators.map((osc) => osc.frequency.setValueAtTimeCalls[0][0]);
+    expect(freqs[0]).toBeCloseTo(392, 5);
+    expect(freqs[1] / freqs[0]).toBeCloseTo(Math.pow(2, 4 / 12), 3);
+    ctx.oscillators.forEach((osc, i) => {
+      expect(osc.startedAt).toBeCloseTo(ctx.currentTime + i * 0.2, 5);
+      expect(osc.stoppedAt).toBeCloseTo(ctx.currentTime + i * 0.2 + 0.4, 5);
+    });
+  });
+});
+
+describe('AudioSystem — errorSound (error del quiz, SPEC §8/Etapa 5)', () => {
+  it('sin unlock y con mute es no-op: no crea ninguna fuente de sonido', () => {
+    const a = makeSystem();
+    a.audio.errorSound();
+    expect(a.created()).toBe(0);
+    expect(a.ctx.oscillators.length).toBe(0);
+
+    const b = makeSystem();
+    b.audio.unlock();
+    b.audio.setMuted(true);
+    b.audio.errorSound();
+    expect(b.ctx.oscillators.length).toBe(0);
+    expect(b.ctx.gains.length).toBe(0);
+  });
+
+  it('dos notas seno una TERCERA MENOR hacia abajo, suave y escalonadas', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.errorSound();
+
+    expect(ctx.oscillators.length).toBe(2);
+    expect(ctx.gains.length).toBe(2);
+
+    const [firstHz, secondHz] = ctx.oscillators.map(
+      (osc) => osc.frequency.setValueAtTimeCalls[0][0],
+    );
+    // Desciende una tercera menor (440 → 369.99, ratio 2^(3/12)).
+    expect(secondHz).toBeLessThan(firstHz);
+    expect(firstHz / secondHz).toBeCloseTo(Math.pow(2, 3 / 12), 3);
+
+    ctx.oscillators.forEach((osc, i) => {
+      expect(osc.type).toBe('sine');
+      expect(osc.startedAt).toBeCloseTo(ctx.currentTime + i * 0.13, 5);
+      expect(osc.stoppedAt).toBeCloseTo(ctx.currentTime + i * 0.13 + 0.3, 5);
+      const gain = ctx.gains[i];
+      // «Suave»: por debajo del volumen del arpegio (0.9·MASTER) y del blip.
+      const [gainStart] = gain.gain.setValueAtTimeCalls[0];
+      expect(gainStart).toBeLessThanOrEqual(0.25 * 0.6);
+      expect(gain.gain.exponentialRampCalls.length).toBe(1);
+      expect(osc.connectCalls[0]).toBe(gain);
+      expect(gain.connectCalls[0]).toBe(ctx.destination);
+    });
+  });
+
+  it('respeta duración, espaciado y frecuencias personalizadas', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.errorSound(0.5, 0.25, 330, 262);
+
+    const freqs = ctx.oscillators.map((osc) => osc.frequency.setValueAtTimeCalls[0][0]);
+    expect(freqs).toEqual([330, 262]);
+    expect(freqs[1]).toBeLessThan(freqs[0]);
+    ctx.oscillators.forEach((osc, i) => {
+      expect(osc.startedAt).toBeCloseTo(ctx.currentTime + i * 0.25, 5);
+      expect(osc.stoppedAt).toBeCloseTo(ctx.currentTime + i * 0.25 + 0.5, 5);
+    });
+  });
+});

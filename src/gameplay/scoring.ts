@@ -7,6 +7,8 @@
  *    restante del timer, con FLOOR del restante (45000 ms → 90; 19999 ms →
  *    38). Se suma UNA vez, cuando el reducer pasa a fase `goal`.
  *  - Tap fallido y timeout: 0 puntos (SPEC §5: sin castigo / tanda a 0).
+ *  - Quiz correcto: **+100** (todo o nada; un fallo reinicia el nivel —
+ *    D5/D7). Lo aplica `QuizScene` vía `ScoreSystem.add(QUIZ_POINTS)`.
  *
  * Caso del PLAN (CA Etapa 4): 3 taps (30) + 20 s restantes (40) + quiz
  * pendiente (0) = **70 pts acumulados** — ver tests.
@@ -16,6 +18,9 @@
 
 /** Puntos por tap exitoso sobre el objetivo (SPEC §5). */
 export const TAP_POINTS = 10;
+
+/** Puntos por responder correctamente el quiz (SPEC §5: todo o nada, D5/D7). */
+export const QUIZ_POINTS = 100;
 
 /** Puntos por cada segundo restante al lograr la meta (SPEC §5). */
 export const TIME_BONUS_PER_SECOND = 2;
