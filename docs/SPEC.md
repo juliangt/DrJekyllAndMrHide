@@ -159,12 +159,12 @@ Redacción definitiva a pulir en implementación.
 |---|---|
 | Tap exitoso sobre el objetivo | **+10** (x3 = 30 máx.) |
 | Quiz respondido correctamente | **+100** (todo o nada; un fallo reinicia el nivel — D5/D7) |
-| Bonus por tiempo restante al lograr la meta | **+2 por segundo** restante del timer (máx. teórico +84) |
+| Bonus por tiempo restante al lograr la meta | **+2 por segundo** restante del timer (máx. teórico +90) |
 | Tap fallido | 0 (sin castigo) |
 | Timeout | 0 (reintento del minijuego; se descartan los puntos de esa tanda) |
 | Reinicio de nivel por quiz fallido | Se descartan **todos** los puntos ganados en esa tanda del nivel |
 
-- **Puntaje máximo teórico del Nivel 1:** ~**214 pts** (30 + 100 + 84).
+- **Puntaje máximo teórico del Nivel 1:** ~**220 pts** (30 + 100 + 90).
 - El puntaje se muestra en HUD durante `ACTION` y `QUIZ`, y en el resumen final (desglosado).
 - El bonus por tiempo conserva el espíritu «puntos con bonus» (D7), dado que el reintento del quiz
   ya no existe como mecanismo (D5).

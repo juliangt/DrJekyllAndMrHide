@@ -43,11 +43,18 @@ class FakeParam {
 class FakeOscillator {
   type = '';
   readonly frequency = new FakeParam();
+  /** Instantes grabados de start/stop (para verificar duraciones). */
+  startedAt: number | null = null;
+  stoppedAt: number | null = null;
   connect(): unknown {
     return null;
   }
-  start(): void {}
-  stop(): void {}
+  start(when?: number): void {
+    this.startedAt = when ?? null;
+  }
+  stop(when?: number): void {
+    this.stoppedAt = when ?? null;
+  }
 }
 
 class FakeGain {
@@ -80,8 +87,11 @@ class FakeContext implements AudioContextLike {
   state = 'running';
   destination = {};
   readonly gains: FakeGain[] = [];
+  readonly oscillators: FakeOscillator[] = [];
   createOscillator(): FakeOscillator {
-    return new FakeOscillator();
+    const osc = new FakeOscillator();
+    this.oscillators.push(osc);
+    return osc;
   }
   createGain(): FakeGain {
     const gain = new FakeGain();
@@ -178,12 +188,17 @@ describe('pulido de audio — volúmenes relativos (SPEC §8, Etapa 7)', () => {
     expect(thumpGain).toBeGreaterThan(errorGain);
   });
 
-  it('el tick sigue siendo un click BREVE (0.05 s por defecto, no cansa)', () => {
-    // La duración no la toca el pulido; se re-fija aquí como guardia.
-    expect(0.05).toBe(0.05);
+  it('el tick sigue siendo un click BREVE (0.05 s programados, no cansa)', () => {
+    // Guardia CONDUCTUAL (no tautológica): la duración real es la que el
+    // sistema programa en el oscilador (stop − start), no un literal suelto.
     const a = unlockedSystem();
     a.audio.tick();
     expect(a.ctx.gains.length).toBe(1);
+    const osc = a.ctx.oscillators[0];
+    expect(osc).toBeDefined();
+    expect(osc.startedAt).not.toBeNull();
+    expect(osc.stoppedAt).not.toBeNull();
+    expect(osc.stoppedAt! - osc.startedAt!).toBeCloseTo(0.05, 6);
   });
 });
 
