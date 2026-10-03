@@ -1,11 +1,13 @@
 # Deploy estático a GitHub Pages (SPEC §10.1).
-# En cada push a main: build con Vite (base './' para funcionar bajo subpath)
-# y publicación del directorio dist/.
+# Build con Vite (base './' para funcionar bajo subpath) y publicación de dist/.
+#
+# NOTA: GitHub Pages requiere un plan que lo soporte (repo público en Free) y
+# Pages habilitado con build_type=workflow en Settings → Pages. Hasta entonces
+# este workflow queda en manual: ejecutarlo desde la pestaña Actions una vez
+# habilitado (deploy de la Etapa 7 del PLAN).
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

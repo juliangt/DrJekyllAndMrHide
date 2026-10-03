@@ -1,9 +1,9 @@
-# CI: tests + build de tipos/producción. Solo se ejecuta manualmente
-# (pestaña Actions → CI → Run workflow).
+# CI: tests + build de tipos/producción en cada push y pull request.
 name: CI
 
 on:
-  workflow_dispatch:
+  push:
+  pull_request:
 
 jobs:
   ci:
