@@ -60,6 +60,8 @@ export const NarrativeAction = {
   Tap: 'tap',
   /** Botón «Saltar»: termina la narrativa inmediatamente. */
   Skip: 'skip',
+  /** Flecha «atrás» del costado: retrocede un panel (idempotente en el 1º). */
+  Back: 'back',
 } as const;
 
 export type NarrativeAction = (typeof NarrativeAction)[keyof typeof NarrativeAction];
@@ -75,8 +77,34 @@ export interface NarrativeProgressState {
 }
 
 /** Estado inicial para `total` paneles (clampa totales inválidos a 1). */
-export function initialNarrativeState(total: number): NarrativeProgressState {
-  return { index: 0, total: Math.max(1, Math.floor(total)), done: false };
+export function initialNarrativeState(
+  total: number,
+  startIndex = 0,
+): NarrativeProgressState {
+  const safeTotal = Math.max(1, Math.floor(total));
+  const index = Math.min(Math.max(0, Math.floor(startIndex)), safeTotal - 1);
+  return { index, total: safeTotal, done: false };
+}
+
+/**
+ * Cuántos paneles del nivel cuenta YA la cinemática de la intro: el acto 1
+ * (el laboratorio y la transformación) y el acto 2 (el callejón, la niña y
+ * la amenaza) reproducen los paneles 1–3 — llegar desde la intro y releerlos
+ * se sentía como repetir la historia. Debe mantenerse en sync con los beats
+ * de `config/intro.ts` (lo custodian los tests de continuidad).
+ */
+export const NARRATIVE_INTRO_RETOLD_PANELS = 3;
+
+/**
+ * Índice donde arranca la narrativa: 0 normalmente; si el jugador viene de
+ * la intro (`fromIntro`), salta directo al primer panel que NO contó la
+ * cinemática (la instrucción «Es hora del susto»). Nunca pasa del último.
+ */
+export function narrativeStartIndex(fromIntro: boolean, total: number): number {
+  if (!fromIntro) {
+    return 0;
+  }
+  return Math.min(NARRATIVE_INTRO_RETOLD_PANELS, Math.max(0, Math.floor(total) - 1));
 }
 
 /**
@@ -85,6 +113,8 @@ export function initialNarrativeState(total: number): NarrativeProgressState {
  *  - `skip` → `done: true` inmediato (el índice NO se toca: el indicador
  *    muestra el panel por el que iba).
  *  - `tap` avanza una viñeta; un tap EN EL ÚLTIMO panel termina (`done`).
+ *  - `back` retrocede una viñeta (flecha del costado); en el PRIMER panel es
+ *    idempotente (no hay «antes del primero») y con `done` no hace nada.
  *  - Con `done: true` toda acción es idempotente (devuelve el mismo estado).
  *  - El índice NUNCA sale de [0, total-1]: no hay «más allá del último».
  */
@@ -97,6 +127,9 @@ export function narrativeProgress(
   }
   if (action === NarrativeAction.Skip) {
     return { ...state, done: true };
+  }
+  if (action === NarrativeAction.Back) {
+    return state.index > 0 ? { ...state, index: state.index - 1 } : state;
   }
   if (state.index >= state.total - 1) {
     // Tap sobre el último panel: la viñeta termina (índice congelado en el
@@ -351,6 +384,27 @@ export const NARRATIVE_SCENE_LAYOUT = {
   skipButton: { x: BASE_WIDTH - 40 - 110, y: 96 },
   /** Ancla izquierda del indicador de progreso (esquina superior izquierda). */
   progress: { x: 56, y: 96 },
+  /**
+   * Flechas de navegación al COSTADO de la pantalla (adelante/atrás): la
+   * señal visible de que la historia se pasa página a página — sin depender
+   * del tap «invisible» en cualquier parte (que sigue funcionando). La
+   * flecha mira a la DERECHA; la izquierda se voltea con flipX. Quedan en la
+   * banda del fondo (entre el borde superior y el panel, y ≈ 560), centradas
+   * verticalmente con la escena. La textura es 64×96: escala 0.9 ≈ 86 px de
+   * alto (táctil ≥ 64 px, SPEC §9).
+   */
+  nav: {
+    /** Margen del centro de la flecha al borde del lienzo. */
+    marginX: 52,
+    /** Altura vertical de ambas flechas (banda del fondo, sobre el panel). */
+    y: 560,
+    /** Escala de la textura 64×96. */
+    scale: 0.9,
+    /** Alfa cuando la acción no está disponible (atrás en el primer panel). */
+    disabledAlpha: 0.28,
+    /** Escala al presionar (feedback táctil, la restituye el tween). */
+    pressedScale: 0.85,
+  },
   /** Profundidades: fondo (capas 0–5 + props 6–8) < panel < UI. */
   depths: { panel: 10, ui: 12, propStart: 6 },
   /** Timing de los crossfades de avance (feedback sutil, ms). */
@@ -390,6 +444,15 @@ export interface LoreGround {
   y: number;
 }
 
+/** Una estrella del cielo nocturno (posición determinista + titileo por fase). */
+export interface LoreStarSlot {
+  x: number;
+  y: number;
+  scale: number;
+  /** Alfa base del titileo (la escena la modula con `lampFlicker`). */
+  alpha: number;
+}
+
 /** Qué pinta `NarrativeScene` de fondo para cada `LoreBackground`. */
 export interface LoreBackgroundDef {
   /** Color base del cielo. */
@@ -400,7 +463,26 @@ export interface LoreBackgroundDef {
   ground?: LoreGround;
   /** Elementos estáticos encima de las capas (mesa, frascos…). */
   props: readonly LorePropSlot[];
+  /** Estrellas del cielo (solo exteriores; detrás de las siluetas). */
+  stars?: readonly LoreStarSlot[];
 }
+
+/**
+ * Estrellas del cielo nocturno (compartidas por los fondos exteriores):
+ * posiciones deterministas en la banda de cielo (y ≤ 340, por encima de las
+ * siluetas de edificios), alfas variados para que el titileo no sea uniforme.
+ * El laboratorio es interior: sin estrellas.
+ */
+export const NIGHT_STARS: readonly LoreStarSlot[] = [
+  { x: 78, y: 74, scale: 0.9, alpha: 0.8 },
+  { x: 186, y: 150, scale: 0.6, alpha: 0.55 },
+  { x: 268, y: 58, scale: 1.0, alpha: 0.9 },
+  { x: 356, y: 210, scale: 0.55, alpha: 0.5 },
+  { x: 428, y: 96, scale: 0.8, alpha: 0.75 },
+  { x: 512, y: 44, scale: 0.6, alpha: 0.6 },
+  { x: 596, y: 176, scale: 0.9, alpha: 0.8 },
+  { x: 668, y: 260, scale: 0.55, alpha: 0.5 },
+];
 
 /**
  * Tabla de fondos por viñeta (SPEC §4.1 + §7.2): la mitad inferior la tapa
@@ -414,12 +496,14 @@ export const LORE_BACKGROUNDS: Readonly<Record<LoreBackground, LoreBackgroundDef
     layers: STREET_PARALLAX_LAYERS,
     ground: { color: street, y: 700 },
     props: [],
+    stars: NIGHT_STARS,
   },
   alley: {
     backgroundColor: nightBackground,
     layers: ALLEY_PARALLAX_LAYERS,
     ground: { color: street, y: 690 },
     props: [],
+    stars: NIGHT_STARS,
   },
   lab: {
     backgroundColor: nightBackground,

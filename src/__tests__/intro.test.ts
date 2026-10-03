@@ -35,7 +35,7 @@ import { BASE_HEIGHT, BASE_WIDTH } from '../config/dimensions';
 import { getLevel } from '../config/levels';
 import { LAB_PARALLAX_LAYERS } from '../art/parallax';
 import { TEXTURE_KEYS } from '../art/textures';
-import { NARRATIVE_SKIP_BUTTON } from '../config/narrative';
+import { NARRATIVE_INTRO_RETOLD_PANELS, NARRATIVE_SKIP_BUTTON } from '../config/narrative';
 
 // ---- Máquina de beats ---------------------------------------------------------
 
@@ -187,6 +187,7 @@ describe('INTRO — destino y presupuesto de niebla', () => {
     }
     expect(INTRO_TEXTURES.jekyll).toBe('jekyll');
     expect(INTRO_TEXTURES.hyde).toBe('hyde');
+    expect(INTRO_TEXTURES.arm).toBe('hyde-arm');
     expect(INTRO_TEXTURES.girl).toBe('girl');
   });
 });
@@ -251,6 +252,10 @@ describe('configs de animación del acto 2 (el callejón)', () => {
     expect(W.bob.px).toBeGreaterThan(0);
     expect(W.bob.cycleMs).toBeGreaterThan(0);
     expect(W.rockRad).toBeLessThan(0.1); // balanceo sutil, paso humano
+    // El brazo articulado acompaña el paso (vaivén visible pero humano).
+    expect(W.arm.swayRad).toBeGreaterThan(0);
+    expect(W.arm.swayRad).toBeLessThan(0.6);
+    expect(W.arm.cycleMs).toBeGreaterThan(0);
     // Camina a la ALTURA del personaje (mismo suelo que el laboratorio).
     expect(W.toX).toBeLessThan(character.x);
   });
@@ -282,10 +287,15 @@ describe('configs de animación del acto 2 (el callejón)', () => {
     expect(M.lunge.toX).toBeLessThan(girl.x);
     expect(M.flinch.toX).toBeGreaterThan(girl.x); // se encoge HACIA ATRÁS
     expect(M.flinch.toX).toBeLessThan(BASE_WIDTH); // sin salir del lienzo
-    // Alza el brazo a MEDIAS: rotación parcial (amenaza sugerida, 10+).
+    // Alza el brazo ARTICULADO desde el hombro: giro amplio (~80°, el brazo
+    // queda bien en alto y legible) pero SIEMPRE parcial — jamás el arco
+    // completo por encima de la cabeza (amenaza sugerida, 10+).
     expect(Math.abs(M.armRaise.rad)).toBeGreaterThan(0.2);
-    expect(Math.abs(M.armRaise.rad)).toBeLessThan(1);
+    expect(Math.abs(M.armRaise.rad)).toBeLessThan(2.2);
     expect(M.armRaise.durationMs).toBeGreaterThan(0);
+    // El torso se encorva hacia adelante al acechar (postura de amenaza).
+    expect(M.hunchRad).toBeGreaterThan(0);
+    expect(M.hunchRad).toBeLessThan(0.3);
     expect(M.tremble.scaleY).toBeLessThan(1); // se hace pequeña
     expect(M.tremble.repeats).toBeGreaterThanOrEqual(1);
     expect(M.puffs.count).toBeGreaterThanOrEqual(1);
@@ -296,6 +306,9 @@ describe('configs de animación del acto 2 (el callejón)', () => {
     // Pose congelada: menos rotación que el alzo (el golpe NUNCA se completa).
     expect(C.armHoldRad).toBeLessThan(0);
     expect(C.armHoldRad).toBeGreaterThan(INTRO_MENACE.armRaise.rad);
+    // La pose respira (vaivén mínimo alrededor del brazo en alto).
+    expect(C.armBreatheRad).toBeGreaterThan(0);
+    expect(C.armBreatheRad).toBeLessThan(0.3);
     expect(C.veil.alpha).toBeGreaterThan(0);
     expect(C.veil.alpha).toBeLessThanOrEqual(0.5); // el letrero se lee igual
     expect(C.veil.durationMs).toBeGreaterThan(0);
@@ -397,12 +410,45 @@ describe('IntroScene — wiring de la máquina de beats (leído como fuente)', (
     expect(source).toContain('Back.easeOut'); // pop de escala al revelar
   });
 
-  it('el cierre es SIEMPRE wipe de niebla hacia NARRATIVE con { levelId }', () => {
+  it('el cierre es SIEMPRE wipe de niebla hacia NARRATIVE con { levelId, fromIntro }', () => {
     expect(source).toContain(
-      'wipeTo(this, SceneKey.NARRATIVE, { levelId: INTRO_TARGET_LEVEL_ID })',
+      'wipeTo(this, SceneKey.NARRATIVE, { levelId: INTRO_TARGET_LEVEL_ID, fromIntro: true })',
     );
     // Un único punto de salida (exitToNarrative con guard propio).
     expect(source.match(/wipeTo\(/g)?.length).toBe(1);
+  });
+
+  it('la intro pasa fromIntro: la narrativa NO repite los paneles que la cinemática ya contó', () => {
+    // Los beats del acto 2 retoman los paneles 3–4 del lore (continuidad)…
+    expect(source).toContain('fromIntro: true');
+    // …y la config narrativa define cuántos paneles cuenta la cinemática.
+    expect(NARRATIVE_INTRO_RETOLD_PANELS).toBe(3);
+  });
+
+  it('navegación UNIFICADA: flechas al costado para ir adelante y atrás entre beats', () => {
+    // Mismo patrón que la narrativa: textura arrow, flipX en «atrás», hitArea.
+    expect(source).toContain('private buildNavArrows(): void');
+    expect(source).toContain('TEXTURE_KEYS.arrow');
+    expect(source).toMatch(/private prevArrow!: Phaser\.GameObjects\.Image/);
+    expect(source).toMatch(/private nextArrow!: Phaser\.GameObjects\.Image/);
+    // «Atrás» re-entra al beat anterior (los players normalizan su estado).
+    expect(source).toMatch(
+      /private onNavBack\(\): void[\s\S]*?this\.clearBeatFx\(\);[\s\S]*?this\.enterBeat\(this\.beatIndex - 1\);/,
+    );
+    // «Adelante» es la MISMA semántica que el tap (en el último beat, cierra).
+    expect(source).toMatch(/private onNavForward\(\): void[\s\S]*?this\.onTap\(\);/);
+    // El estado se refresca en cada beat («atrás» atenuada en el primero).
+    expect(source).toMatch(/private enterBeat\([\s\S]*?this\.updateNavArrows\(\);/);
+  });
+
+  it('volver atrás entre actos restituye el fondo coherente (laboratorio ↔ callejón)', () => {
+    // Los beats del acto 1 garantizan el lab; el paseo garantiza el callejón.
+    expect(source.match(/this\.ensureBackground\(LORE_BACKGROUNDS\.lab, true\)/g)?.length).toBe(3);
+    expect(source).toContain('this.ensureBackground(LORE_BACKGROUNDS.alley, true)');
+    // ensureBackground NO reconstruye si el fondo ya es el vigente.
+    expect(source).toMatch(
+      /private ensureBackground\([\s\S]*?if \(this\.activeBackground !== def\) \{/,
+    );
   });
 
   it('usa fadeIn, fondo de noche y el botón «Saltar» de la narrativa', () => {
@@ -425,7 +471,7 @@ describe('IntroScene — wiring de la máquina de beats (leído como fuente)', (
   });
 
   it('el paseo troca al callejón CON velo y Hyde emerge de la niebla (fade-in)', () => {
-    expect(source).toContain('buildBackground(LORE_BACKGROUNDS.alley, true)');
+    expect(source).toContain('this.ensureBackground(LORE_BACKGROUNDS.alley, true)');
     // Normaliza la aparición: entra desde fuera (alpha 0) y emerge caminando.
     expect(source).toMatch(/private playAlleyWalk\([\s\S]*?alpha: \{ from: 0, to: 1 \}/);
   });
@@ -438,6 +484,27 @@ describe('IntroScene — wiring de la máquina de beats (leído como fuente)', (
     expect(source).toContain('this.girl.setVisible(false)');
     // …y los otros tres la traen a escena con su estado completo.
     expect(source.match(/this\.girl\s*\.setVisible\(true\)/g)?.length).toBe(3);
+  });
+
+  it('el brazo de Hyde es ARTICULADO: pivote en el hombro, pegado al cuerpo y animado por beat', () => {
+    // Actor propio con pivote en el hombro (origin sobre el nudo 36,16)…
+    expect(source).toContain('private hydeArm!: Phaser.GameObjects.Image');
+    expect(source).toContain('INTRO_TEXTURES.arm');
+    expect(source).toContain('.setOrigin(0.5, 0.125)');
+    // …pegado a Hyde cada frame (posición manda el cuerpo, rotación el beat)…
+    expect(source).toContain('this.syncArmToHyde()');
+    expect(source).toContain('private syncArmToHyde(): void');
+    // …con vaivén de paseo y ALZA del acecho en el brazo (no en el cuerpo entero).
+    expect(source).toMatch(
+      /rotation: \{ from: W\.arm\.swayRad, to: -W\.arm\.swayRad \}/,
+    );
+    expect(source).toMatch(
+      /targets: this\.hydeArm,[\s\S]*?rotation: \{ from: 0, to: M\.armRaise\.rad \}/,
+    );
+    // La pose del cierre respira alrededor del brazo en alto.
+    expect(source).toMatch(
+      /rotation: \{ from: C\.armHoldRad, to: C\.armHoldRad \+ C\.armBreatheRad \}/,
+    );
   });
 
   it('la amenaza es SIN CONTACTO: el brazo se alza a medias y el beat termina antes de golpear', () => {

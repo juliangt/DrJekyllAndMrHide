@@ -21,6 +21,7 @@ import type Phaser from 'phaser';
 import {
   buildings,
   error,
+  fogFar,
   fogMid,
   fogNear,
   hexToNumber,
@@ -81,6 +82,12 @@ export const TEXTURE_KEYS = {
   jekyll: 'jekyll',
   /** Mr. Hyde: silueta jorobada y bestia de la transformación (intro). */
   hyde: 'hyde',
+  /** Brazo delantero de Hyde con garras: sprite articulado (pivote de hombro). */
+  hydeArm: 'hyde-arm',
+  /** Flecha de navegación (apunta a la DERECHA; flipX para «atrás»). */
+  arrow: 'arrow',
+  /** Estrella del cielo nocturno (destello de 4 puntas, titila en runtime). */
+  star: 'star',
 } as const;
 
 /**
@@ -383,8 +390,15 @@ function drawLabFlask(g: Phaser.GameObjects.Graphics): void {
  * es runtime, no parte de la textura.
  */
 function drawGirl(g: Phaser.GameObjects.Graphics): void {
-  const silhouette = hexToNumber(buildings);
+  const silhouette = hexToNumber(fogFar); // un tono MÁS claro que los edificios: se recorta de la noche
   const fire = hexToNumber(lampFire);
+
+  // Resplandor cálido alrededor de TODO el cuerpo: la luz de su propio farol
+  // la separa de la noche (antes su silueta era igual de oscura que el fondo).
+  g.fillStyle(fire, 0.1);
+  g.fillCircle(48, 82, 55);
+  g.fillStyle(fire, 0.14);
+  g.fillCircle(48, 70, 38);
 
   // Halos del farol (la luz que la hace visible en la niebla) — primero,
   // para que la jaula y la niña piquen encima.
@@ -409,6 +423,12 @@ function drawGirl(g: Phaser.GameObjects.Graphics): void {
   g.fillRect(46, 150, 10, 8);
   // Brazo extendido hacia el farol.
   g.fillTriangle(50, 48, 69, 67, 54, 74);
+
+  // Rim light del lado del farol: el borde del brazo y del vestido que da a
+  // la luz se enciende cálido — la figura se lee aunque la noche la trague.
+  g.fillStyle(fire, 0.55);
+  g.fillTriangle(51, 44, 55, 68, 49, 66);
+  g.fillTriangle(51, 72, 64, 118, 57, 116);
 
   // Farol colgando de la mano: asa, jaula y núcleo de fuego.
   g.fillRect(70, 66, 4, 14); // asa
@@ -555,16 +575,20 @@ function drawJekyll(g: Phaser.GameObjects.Graphics): void {
 
 /**
  * Mr. Hyde (intro, acto 1): la versión BESTIA — jorobado y encorvado, cabello
- * salvaje a púas, brazos larguísimos que llegan al suelo con garras, abrigo
- * harapiento con faldones rotos y pies descalzos grandes. Silueta inquietante
- * pero SIN sangre ni heridas (público 10+): la amenaza la cuentan la postura
- * y dos acentos «resabio de la poción» — el ojo verde brillante y un aura
- * púrpura tenue. Determinista.
+ * salvaje a púas, abrigo harapiento con faldones rotos y pies descalzos
+ * grandes. Silueta inquietante pero SIN sangre ni heridas (público 10+): la
+ * amenaza la cuentan la postura y dos acentos «resabio de la poción» — el
+ * ojo verde brillante y un aura púrpura tenue. La cara se lee de LEJOS (se
+ * renderiza a escala 1.7): ojo verde de doble halo con brillo, gruñido con
+ * DIENTES pálidos y mandíbula prognata. El BRAZO DELANTERO no va aquí: es la
+ * textura `hyde-arm`, un sprite articulado que la escena gira desde el
+ * hombro (movilidad del acecho). Determinista.
  */
 function drawHyde(g: Phaser.GameObjects.Graphics): void {
   const dark = hexToNumber(buildings); // silueta completa
   const eye = hexToNumber(labGreen); // ojo brillante
   const aura = hexToNumber(potionPurple); // resabio de la poción
+  const pale = hexToNumber(parchmentLight); // dientes y brillo del ojo
 
   // Aura púrpura tenue + volutas que se desprenden (la poción se le escapa).
   g.fillStyle(aura, 0.1);
@@ -591,13 +615,33 @@ function drawHyde(g: Phaser.GameObjects.Graphics): void {
   g.fillCircle(88, 74, 8);
   g.fillCircle(102, 66, 8);
 
-  // El ojo verde (punto focal, doble halo como los faroles de la niña).
-  g.fillStyle(eye, 0.22);
-  g.fillCircle(106, 88, 8);
+  // El ojo verde (punto focal, TRIPLE halo como los faroles de la niña) con
+  // brillo blanco: la cara se entiende incluso a escala de cinemática.
+  g.fillStyle(eye, 0.14);
+  g.fillCircle(106, 88, 12);
+  g.fillStyle(eye, 0.26);
+  g.fillCircle(106, 88, 8.5);
+  g.fillStyle(eye, 0.5);
+  g.fillCircle(106, 88, 5.5);
   g.fillStyle(eye, 1);
-  g.fillCircle(106, 88, 3);
+  g.fillCircle(106, 88, 3.6);
+  g.fillStyle(pale, 0.9);
+  g.fillCircle(104.6, 86.6, 1.6);
 
-  // Abrigo harapiento: faldones rotos colgando a distinta altura.
+  // Ceja: pico del cerrillo que separa el ojo de la frente (gesto de furia).
+  g.fillStyle(aura, 0.55);
+  g.fillTriangle(98, 82, 114, 79, 112, 85);
+
+  // Gruñido: la mandíbula prognata se abre en dientes pálidos (sin sangre).
+  g.fillStyle(pale, 0.95);
+  g.fillTriangle(101, 102, 105, 102, 103, 107);
+  g.fillTriangle(105, 103, 109, 103, 107, 108);
+  g.fillTriangle(109, 103, 113, 102, 111, 107);
+  g.fillTriangle(113, 102, 116, 101, 115, 106);
+
+  // Abrigo harapiento: faldones rotos colgando a distinta altura (vuelve la
+  // silueta oscura tras los dientes pálidos).
+  g.fillStyle(dark, 1);
   g.fillTriangle(30, 152, 20, 198, 46, 180);
   g.fillTriangle(46, 170, 54, 206, 70, 182);
   g.fillTriangle(70, 178, 82, 200, 94, 176);
@@ -613,21 +657,90 @@ function drawHyde(g: Phaser.GameObjects.Graphics): void {
   g.fillTriangle(40, 118, 26, 178, 46, 182);
   g.fillTriangle(22, 178, 16, 196, 28, 184);
   g.fillTriangle(26, 182, 24, 200, 34, 186);
+}
 
-  // Brazo delantero LARGO llegando al suelo + mano y tres garras.
-  g.fillTriangle(84, 116, 126, 172, 92, 134);
-  g.fillTriangle(92, 134, 126, 172, 110, 148);
-  g.fillCircle(124, 172, 8);
-  g.fillTriangle(122, 164, 140, 176, 126, 178);
-  g.fillTriangle(126, 176, 134, 192, 120, 182);
-  g.fillTriangle(118, 180, 122, 198, 112, 184);
+/**
+ * Brazo delantero de Mr. Hyde (intro): pieza ARTICULADA que la escena monta
+ * sobre el cuerpo con el pivote en el hombro (origin 0.5, 0.125 ≈ el nudo
+ * (36,16) de esta textura 72×128). La longitud hombro→garra (~88 px, la misma
+ * proporción que el brazo dibujado del cuerpo) hace que colgando llegue al
+ * suelo; los tweens de rotación de la escena lo balancean al caminar y lo
+ * ALZAN en el acecho — con hombro propio el gesto tiene la movilidad que un
+ * sprite único no puede dar. Garra pálida de tres uñas (mismo lenguaje que
+ * el ojo). Determinista.
+ */
+function drawHydeArm(g: Phaser.GameObjects.Graphics): void {
+  const dark = hexToNumber(buildings); // brazo (misma silueta que el cuerpo)
+  const aura = hexToNumber(potionPurple); // rim light del abrigo
+  const pale = hexToNumber(parchmentLight); // garras
+
+  // Brazo: del hombro (36,16) baja grueso y se afina hacia la muñeca (34,84).
+  g.fillStyle(dark, 1);
+  g.fillTriangle(22, 22, 50, 20, 40, 86);
+  g.fillTriangle(22, 22, 40, 86, 28, 82);
+  // Manguito del hombro (el «músculo» que tapa el nudo del pivote).
+  g.fillCircle(36, 24, 14);
+  // Rim light púrpura del lado exterior (resabio de la poción, como el aura).
+  g.fillStyle(aura, 0.3);
+  g.fillTriangle(45, 25, 50, 20, 40, 86);
+
+  // Mano cerrada en la muñeca.
+  g.fillStyle(dark, 1);
+  g.fillCircle(34, 90, 8);
+
+  // Tres garras pálidas curvadas hacia abajo (amenaza sin sangre).
+  g.fillStyle(pale, 0.95);
+  g.fillTriangle(23, 93, 30, 92, 25, 112);
+  g.fillTriangle(31, 95, 37, 94, 34, 115);
+  g.fillTriangle(38, 94, 44, 92, 41, 112);
+}
+
+// ---- Texturas de navegación y cielo (flechas de página, estrellas) -----------
+
+/**
+ * Estrella del cielo nocturno: destello de 4 puntas con núcleo brillante
+ * (marcador pálido de la paleta, visible sobre la noche #0d0f14). La escena
+ * la titila por opacidad con `lampFlicker` y fases propias por estrella.
+ * Determinista.
+ */
+function drawStar(g: Phaser.GameObjects.Graphics): void {
+  const glow = hexToNumber(textPrimary);
+
+  // Halo suave + cruz de 4 puntas (dos rombos finos) + núcleo.
+  g.fillStyle(glow, 0.16);
+  g.fillCircle(16, 16, 10);
+  g.fillStyle(glow, 0.85);
+  g.fillTriangle(16, 1, 19, 16, 13, 16);
+  g.fillTriangle(16, 31, 19, 16, 13, 16);
+  g.fillTriangle(1, 16, 16, 13, 16, 19);
+  g.fillTriangle(31, 16, 16, 13, 16, 19);
+  g.fillStyle(glow, 1);
+  g.fillCircle(16, 16, 2.4);
+}
+
+/**
+ * Flecha de navegación (apunta a la DERECHA; la escena la voltea con flipX
+ * para «atrás»): triángulo pergamino claro con borde oscuro — legible sobre
+ * la niebla nocturna Y sobre el pergamino del panel. Táctil ≥ 64 px: la
+ * escena la escala y le pone hitArea propio. Determinista.
+ */
+function drawArrow(g: Phaser.GameObjects.Graphics): void {
+  const edge = hexToNumber(parchmentDark);
+  const fill = hexToNumber(parchmentLight);
+
+  // Borde oscuro (triángulo mayor) + relleno claro (triángulo interior).
+  g.fillStyle(edge, 1);
+  g.fillTriangle(4, 4, 58, 48, 4, 92);
+  g.fillStyle(fill, 1);
+  g.fillTriangle(16, 24, 44, 48, 16, 72);
 }
 
 /**
  * Registro de texturas: primera hornada (PLAN Etapa 1) + iconos de la
  * Etapa 2 («Cómo jugar» y toggle de mute) + fondo «lab» de la Etapa 3 +
  * la niña de la Etapa 4 + el sello de cera de la Etapa 6 + los dos personajes
- * de la intro (Jekyll/Hyde, cinemática pre-nivel). Hornadas futuras se añaden
+ * de la intro (Jekyll/Hyde, cinemática pre-nivel) + el brazo articulado de
+ * Hyde y la flecha de navegación. Hornadas futuras se añaden
  * AQUÍ AL FINAL (hay tests que hacen slicing por índice del registro).
  */
 export const TEXTURE_DEFS: readonly TextureDef[] = [
@@ -743,8 +856,32 @@ export const TEXTURE_DEFS: readonly TextureDef[] = [
     width: 144,
     height: 240,
     description:
-      'Mr. Hyde: silueta jorobada y bestia con garras, ojo verde y aura púrpura (intro).',
+      'Mr. Hyde: silueta jorobada y bestia con ojo verde y dientes, SIN brazo delantero (intro).',
     draw: drawHyde,
+  },
+  {
+    key: TEXTURE_KEYS.hydeArm,
+    width: 72,
+    height: 128,
+    description:
+      'Brazo delantero de Hyde con garras: sprite articulado con pivote en el hombro (intro).',
+    draw: drawHydeArm,
+  },
+  {
+    key: TEXTURE_KEYS.arrow,
+    width: 64,
+    height: 96,
+    description:
+      'Flecha de navegación a la derecha (flipX = atrás): avance/retroceso de páginas narrativas.',
+    draw: drawArrow,
+  },
+  {
+    key: TEXTURE_KEYS.star,
+    width: 32,
+    height: 32,
+    description:
+      'Estrella del cielo nocturno de 4 puntas: titila por opacidad en los fondos exteriores.',
+    draw: drawStar,
   },
 ];
 

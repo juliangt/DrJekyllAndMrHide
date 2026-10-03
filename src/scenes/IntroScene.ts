@@ -51,10 +51,12 @@ import {
 import { SceneKey } from '../config/sceneKeys';
 import { ParallaxField } from '../art/ParallaxField';
 import { lampFlicker } from '../art/parallax';
+import { TEXTURE_KEYS } from '../art/textures';
 import {
   LORE_BACKGROUNDS,
   NARRATIVE_SKIP_BUTTON,
   type LoreBackgroundDef,
+  type LoreStarSlot,
 } from '../config/narrative';
 import {
   INTRO_ALLEY_WALK,
@@ -92,9 +94,18 @@ export class IntroScene extends Phaser.Scene {
   private field: ParallaxField | null = null;
   private backgroundObjects: Phaser.GameObjects.Image[] = [];
   private readonly glowing: GlowingProp[] = [];
+  /** Def del fondo VIGENTE (identidad): permite volver al acto 1 con coherencia. */
+  private activeBackground: LoreBackgroundDef | null = null;
 
   private jekyll!: Phaser.GameObjects.Image;
   private hyde!: Phaser.GameObjects.Image;
+  /**
+   * Brazo delantero ARTICULADO de Hyde (textura `hyde-arm` con el pivote en
+   * el hombro): la escena lo pega a Hyde cada frame (`update`) y los beats
+   * lo animan con rotación propia — vaivén al caminar, ALZA en el acecho,
+   * pose congelada con respiración en el cierre.
+   */
+  private hydeArm!: Phaser.GameObjects.Image;
   /** La niña (acto 2): oculta hasta el beat «GirlAppears»; farol hacia Hyde. */
   private girl!: Phaser.GameObjects.Image;
   private captionText!: Phaser.GameObjects.Text;
@@ -105,6 +116,9 @@ export class IntroScene extends Phaser.Scene {
   private beatTimer?: Phaser.Time.TimerEvent;
   /** FX transitorios del beat vigente (se destruyen al avanzar/salir). */
   private readonly beatFx: Phaser.GameObjects.GameObject[] = [];
+  /** Flechas del costado (adelante/atrás ENTRE BEATS): navegación unificada. */
+  private prevArrow!: Phaser.GameObjects.Image;
+  private nextArrow!: Phaser.GameObjects.Image;
   /** True cuando ya se disparó la salida hacia NARRATIVE (anti doble tap). */
   private exiting = false;
 
@@ -143,6 +157,7 @@ export class IntroScene extends Phaser.Scene {
     this.buildCharacters();
     this.buildCaption();
     this.buildSkipButton();
+    this.buildNavArrows();
     this.buildTapLayer();
 
     // Ambiente al entrar (SPEC §8) — solo si un gesto anterior desbloqueó
@@ -160,6 +175,22 @@ export class IntroScene extends Phaser.Scene {
     for (const prop of this.glowing) {
       prop.sprite.alpha = prop.baseAlpha * lampFlicker(t + prop.phase, 0.72, 1.6);
     }
+    this.syncArmToHyde();
+  }
+
+  /**
+   * El brazo articulado PEGA a Hyde cada frame: pivote (hombro) anclado al
+   * offset constante (12, −8) del centro de su textura 144×240 — escalado por
+   * el sprite. La posición la manda el cuerpo (tweens de paseo/acecho); la
+   * ROTACIÓN es propia de cada beat. Visible solo cuando Hyde lo está.
+   */
+  private syncArmToHyde(): void {
+    this.hydeArm.setVisible(this.hyde.visible);
+    if (!this.hydeArm.visible) {
+      return;
+    }
+    const k = INTRO_SCENE_LAYOUT.character.scale;
+    this.hydeArm.setPosition(this.hyde.x + 12 * k, this.hyde.y - 8 * k);
   }
 
   // ---- Fondo (reutilizable: el acto 2 troca al callejón con animated=true) ----
@@ -172,6 +203,7 @@ export class IntroScene extends Phaser.Scene {
    * los players recolocan/recrean a los personajes por su cuenta.
    */
   private buildBackground(def: LoreBackgroundDef, animated = false): void {
+    this.activeBackground = def;
     if (animated) {
       const veil = this.add
         .rectangle(
@@ -219,6 +251,29 @@ export class IntroScene extends Phaser.Scene {
         this.glowing.push({ sprite, baseAlpha: prop.alpha, phase: propIndex * 0.9 });
       }
     });
+
+    // Estrellas del cielo (solo el callejón del acto 2): detrás de las
+    // siluetas (capas ≥ 1) y titilando con fases propias, como en narrativa.
+    (def.stars ?? []).forEach((star: LoreStarSlot, starIndex) => {
+      const sprite = this.add
+        .image(star.x, star.y, TEXTURE_KEYS.star)
+        .setScale(star.scale)
+        .setAlpha(star.alpha)
+        .setDepth(0.75);
+      this.backgroundObjects.push(sprite);
+      this.glowing.push({ sprite, baseAlpha: star.alpha, phase: starIndex * 1.7 });
+    });
+  }
+
+  /**
+   * Garantiza que el fondo VIGENTE sea el pedido: si ya lo es, no toca nada
+   * (volver con la flecha «atrás» de un acto al otro no debe reconstruir ni
+   * parpadear); si no, lo troca — con velo si el cambio es teatral.
+   */
+  private ensureBackground(def: LoreBackgroundDef, animated = false): void {
+    if (this.activeBackground !== def) {
+      this.buildBackground(def, animated);
+    }
   }
 
   // ---- Actores fijos de la escena --------------------------------------------
@@ -236,6 +291,15 @@ export class IntroScene extends Phaser.Scene {
       .image(character.x, character.y, INTRO_TEXTURES.hyde)
       .setScale(character.scale)
       .setDepth(character.depth)
+      .setAlpha(0)
+      .setVisible(false);
+    // El brazo articulado: pivote en el hombro (36,16) de la textura 72×128,
+    // delante del cuerpo, y oculto hasta que Hyde se transforma.
+    this.hydeArm = this.add
+      .image(character.x, character.y, INTRO_TEXTURES.arm)
+      .setOrigin(0.5, 0.125)
+      .setScale(character.scale)
+      .setDepth(character.depth + 0.5)
       .setAlpha(0)
       .setVisible(false);
     // La niña (acto 2): oculta hasta «GirlAppears»; flipX para que su farol
@@ -293,6 +357,83 @@ export class IntroScene extends Phaser.Scene {
     }).setDepth(skipButton.depth);
   }
 
+  // ---- Flechas del costado (adelante/atrás entre beats) -----------------------
+
+  /**
+   * MISMA navegación que la narrativa: flecha a cada costado para pasar de
+   * beat, «atrás» atenuada en el primero. Van más arriba que en la narrativa
+   * (`INTRO_SCENE_LAYOUT.nav.y`) para no pisar a los personajes. El auto-
+   * avance por tiempo y el tap en cualquier parte siguen funcionando.
+   */
+  private buildNavArrows(): void {
+    const { nav } = INTRO_SCENE_LAYOUT;
+    const hit = 100;
+    const half = hit / 2;
+
+    this.prevArrow = this.add
+      .image(nav.marginX, nav.y, TEXTURE_KEYS.arrow)
+      .setScale(nav.scale)
+      .setFlipX(true)
+      .setDepth(nav.depth)
+      .setInteractive({
+        hitArea: new Phaser.Geom.Rectangle(-half, -half, hit, hit),
+        hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+      })
+      .on(Phaser.Input.Events.POINTER_DOWN, () => this.onNavBack());
+
+    this.nextArrow = this.add
+      .image(BASE_WIDTH - nav.marginX, nav.y, TEXTURE_KEYS.arrow)
+      .setScale(nav.scale)
+      .setDepth(nav.depth)
+      .setInteractive({
+        hitArea: new Phaser.Geom.Rectangle(-half, -half, hit, hit),
+        hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+      })
+      .on(Phaser.Input.Events.POINTER_DOWN, () => this.onNavForward());
+
+    this.updateNavArrows();
+  }
+
+  /** Estado de las flechas: «atrás» se atenúa en el primer beat. */
+  private updateNavArrows(): void {
+    const { nav } = INTRO_SCENE_LAYOUT;
+    const canGoBack = this.beatIndex > 0 && !this.exiting;
+    this.prevArrow.setAlpha(canGoBack ? 1 : nav.disabledAlpha);
+    this.nextArrow.setAlpha(this.exiting ? nav.disabledAlpha : 1);
+  }
+
+  /** Feedback táctil del press (se restituye solo, como en la narrativa). */
+  private pressFeedback(arrow: Phaser.GameObjects.Image): void {
+    const { nav } = INTRO_SCENE_LAYOUT;
+    this.tweens.killTweensOf(arrow);
+    this.tweens.add({
+      targets: arrow,
+      scale: { from: nav.scale * nav.pressedScale, to: nav.scale },
+      duration: 180,
+      ease: 'Back.easeOut',
+    });
+  }
+
+  /** Flecha «atrás»: re-entra al beat anterior (los players normalizan todo). */
+  private onNavBack(): void {
+    if (this.exiting || this.beatIndex <= 0) {
+      return;
+    }
+    this.audioSystem.blip();
+    this.pressFeedback(this.prevArrow);
+    this.clearBeatFx();
+    this.enterBeat(this.beatIndex - 1);
+  }
+
+  /** Flecha «adelante»: la MISMA semántica que el tap (en el último, cierra). */
+  private onNavForward(): void {
+    if (this.exiting) {
+      return;
+    }
+    this.pressFeedback(this.nextArrow);
+    this.onTap();
+  }
+
   /** Capa de tap bajo toda la UI: cualquier punto de la pantalla avanza. */
   private buildTapLayer(): void {
     this.add
@@ -318,6 +459,7 @@ export class IntroScene extends Phaser.Scene {
     this.beatPlayers[beat.id](beat);
     // Auto-avance al agotarse la duración del beat (el tap lo adelanta).
     this.beatTimer = this.time.delayedCall(beat.durationMs, () => this.advance());
+    this.updateNavArrows();
   }
 
   /**
@@ -374,19 +516,24 @@ export class IntroScene extends Phaser.Scene {
       return;
     }
     this.exiting = true;
+    this.updateNavArrows();
     this.clearBeatFx();
     // Sweep de viento de la transición (SPEC §8), si el audio ya está desbloqueado.
     if (this.audioSystem.isUnlocked) {
       this.audioSystem.wind(1.6);
     }
-    wipeTo(this, SceneKey.NARRATIVE, { levelId: INTRO_TARGET_LEVEL_ID });
+    // `fromIntro`: la narrativa arranca en el primer panel que la cinemática
+    // NO contó (los 1–3 ya se vieron animados — no se lee la historia dos veces).
+    wipeTo(this, SceneKey.NARRATIVE, { levelId: INTRO_TARGET_LEVEL_ID, fromIntro: true });
   }
 
   // ---- Beat 1 — ENTRANCE: Jekyll aparece en su laboratorio --------------------
 
   private playEntrance(beat: IntroBeat): void {
     const { character } = INTRO_SCENE_LAYOUT;
-    // Normaliza (un tap pudo cortar el beat anterior o este mismo).
+    // Normaliza (un tap o la flecha «atrás» pudo cortar el beat anterior o
+    // este mismo). Volver desde el acto 2 restituye el laboratorio.
+    this.ensureBackground(LORE_BACKGROUNDS.lab, true);
     this.jekyll
       .setVisible(true)
       .setPosition(character.x, character.y)
@@ -425,6 +572,7 @@ export class IntroScene extends Phaser.Scene {
 
   private playDrink(beat: IntroBeat): void {
     const { character } = INTRO_SCENE_LAYOUT;
+    this.ensureBackground(LORE_BACKGROUNDS.lab, true);
     this.jekyll
       .setVisible(true)
       .setPosition(character.x, character.y)
@@ -487,7 +635,9 @@ export class IntroScene extends Phaser.Scene {
     const { character, flashDepth } = INTRO_SCENE_LAYOUT;
     const T = INTRO_TRANSFORMATION;
 
-    // Normaliza: Jekyll entero en el centro, Hyde esperando invisible.
+    // Normaliza: Jekyll entero en el centro, Hyde esperando invisible. Si se
+    // volvió atrás desde el callejón, el laboratorio vuelve a escena.
+    this.ensureBackground(LORE_BACKGROUNDS.lab, true);
     this.jekyll
       .setVisible(true)
       .setPosition(character.x, character.y)
@@ -499,6 +649,8 @@ export class IntroScene extends Phaser.Scene {
       .setPosition(character.x, character.y)
       .setScale(character.scale * T.pop.fromFactor)
       .setAlpha(0);
+    // El brazo nace con Hyde: mismo retardo y duración que el crossfade.
+    this.hydeArm.setVisible(true).setRotation(0).setAlpha(0);
 
     // Golpe dramático (thump respeta mute/desbloqueo internamente).
     this.audioSystem.thump();
@@ -620,13 +772,14 @@ export class IntroScene extends Phaser.Scene {
     const { character } = INTRO_SCENE_LAYOUT;
     const W = INTRO_ALLEY_WALK;
 
-    // Troca de fondo con velo de noche (el laboratorio → el callejón).
-    this.buildBackground(LORE_BACKGROUNDS.alley, true);
+    // Troca al callejón con velo de noche (solo si el fondo vigente no lo es:
+    // re-entrar al beat con las flechas no debe reconstruir el fondo).
+    this.ensureBackground(LORE_BACKGROUNDS.alley, true);
 
     // Normaliza: Jekyll fuera de escena, niña aún oculta y Hyde ENTRANDO por
     // la IZQUIERDA (la textura mira a la derecha: no hay que voltearlo). El
     // salto de posición del crossfade queda tapado: emerge de la niebla con
-    // un fade-in encima del velo del trocado.
+    // un fade-in encima del velo del trocado. El brazo articulado entra con él.
     this.jekyll.setVisible(false).setAlpha(0);
     this.girl.setVisible(false).setAlpha(0);
     this.hyde
@@ -635,6 +788,7 @@ export class IntroScene extends Phaser.Scene {
       .setRotation(0)
       .setScale(character.scale)
       .setAlpha(0);
+    this.hydeArm.setVisible(true).setRotation(0).setAlpha(0);
 
     // Cruza caminando (la deriva del fondo acompaña el paseo)…
     this.tweens.add({
@@ -646,6 +800,12 @@ export class IntroScene extends Phaser.Scene {
     // …emerge de la niebla mientras el velo del fondo se disipa.
     this.tweens.add({
       targets: this.hyde,
+      alpha: { from: 0, to: 1 },
+      duration: W.emergeMs,
+      ease: 'Sine.easeOut',
+    });
+    this.tweens.add({
+      targets: this.hydeArm,
       alpha: { from: 0, to: 1 },
       duration: W.emergeMs,
       ease: 'Sine.easeOut',
@@ -663,6 +823,16 @@ export class IntroScene extends Phaser.Scene {
       targets: this.hyde,
       rotation: { from: W.rockRad, to: -W.rockRad },
       duration: W.bob.cycleMs * 2,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+    // El brazo articulado acompaña el paso: oscila desde el hombro con el
+    // MISMO ciclo del bob — el caminar se lee en todo el cuerpo.
+    this.tweens.add({
+      targets: this.hydeArm,
+      rotation: { from: W.arm.swayRad, to: -W.arm.swayRad },
+      duration: W.arm.cycleMs,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
@@ -686,6 +856,7 @@ export class IntroScene extends Phaser.Scene {
       .setRotation(0)
       .setScale(character.scale)
       .setAlpha(1);
+    this.hydeArm.setVisible(true).setAlpha(1);
     this.girl
       .setVisible(true)
       .setPosition(G.fromX, girl.y)
@@ -707,6 +878,15 @@ export class IntroScene extends Phaser.Scene {
       rotation: { from: -G.tremble.rad, to: G.tremble.rad },
       delay: G.enterMs,
       duration: G.tremble.cycleMs,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+    // El brazo de Hyde cuelga quieto pero VIVO: una respiración mínima.
+    this.tweens.add({
+      targets: this.hydeArm,
+      rotation: { from: 0.05, to: -0.05 },
+      duration: 900,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
@@ -761,7 +941,8 @@ export class IntroScene extends Phaser.Scene {
     // El acecho arranca cuando el destello del ojo completa su yoyo (2 tramos).
     const lungeDelayMs = M.seeDelayMs + M.eyeFlare.durationMs * 2;
 
-    // Normaliza: Hyde al inicio del acecho; la niña en su esquina, entera.
+    // Normaliza: Hyde al inicio del acecho (brazo articulado incluido); la
+    // niña en su esquina, entera.
     this.jekyll.setVisible(false).setAlpha(0);
     this.hyde
       .setVisible(true)
@@ -769,6 +950,7 @@ export class IntroScene extends Phaser.Scene {
       .setRotation(0)
       .setScale(character.scale)
       .setAlpha(1);
+    this.hydeArm.setVisible(true).setAlpha(1).setRotation(0);
     this.girl
       .setVisible(true)
       .setPosition(girl.x, girl.y)
@@ -787,14 +969,23 @@ export class IntroScene extends Phaser.Scene {
       delay: lungeDelayMs,
       duration: M.lunge.durationMs,
       ease: 'Quad.easeIn',
+    });
+    //    …y el torso se ENCORVA hacia adelante mientras acecha.
+    this.tweens.add({
+      targets: this.hyde,
+      rotation: { from: 0, to: M.hunchRad },
+      delay: lungeDelayMs,
+      duration: M.lunge.durationMs,
+      ease: 'Quad.easeIn',
       onComplete: () => {
-        // 3) …y ALZA EL BRAZO: rotación negativa = el lado del brazo sube.
-        //    El beat termina con el brazo EN ALTO: el golpe NUNCA cae.
+        // 3) …y ALZA EL BRAZO: el brazo ARTICULADO gira desde el hombro con
+        //    Back.easeOut (latigazo con overshoot) y queda EN ALTO apuntando
+        //    a la niña. El golpe NUNCA cae.
         this.tweens.add({
-          targets: this.hyde,
+          targets: this.hydeArm,
           rotation: { from: 0, to: M.armRaise.rad },
           duration: M.armRaise.durationMs,
-          ease: 'Sine.easeOut',
+          ease: 'Back.easeOut',
         });
       },
     });
@@ -883,15 +1074,17 @@ export class IntroScene extends Phaser.Scene {
     const { character, girl } = INTRO_SCENE_LAYOUT;
     const C = INTRO_PLAYER_IS_HYDE;
 
-    // Normaliza: Hyde con el brazo EN ALTO (pose congelada: el golpe nunca
-    // cae), la niña encogida en su esquina; Jekyll fuera de escena.
+    // Normaliza: Hyde con el BRAZO ARTICULADO EN ALTO (pose congelada: el
+    // golpe nunca cae), el torso encorvado del acecho; la niña encogida en su
+    // esquina; Jekyll fuera de escena.
     this.jekyll.setVisible(false).setAlpha(0);
     this.hyde
       .setVisible(true)
       .setPosition(INTRO_MENACE.lunge.toX, character.y)
-      .setRotation(C.armHoldRad)
+      .setRotation(INTRO_MENACE.hunchRad)
       .setScale(character.scale)
       .setAlpha(1);
+    this.hydeArm.setVisible(true).setAlpha(1).setRotation(C.armHoldRad);
     this.girl
       .setVisible(true)
       .setPosition(INTRO_MENACE.flinch.toX, girl.y)
@@ -905,6 +1098,15 @@ export class IntroScene extends Phaser.Scene {
       targets: this.girl,
       scaleY: girl.scale * INTRO_MENACE.tremble.scaleY,
       duration: 260,
+      yoyo: true,
+      repeat: -1,
+      ease: 'Sine.easeInOut',
+    });
+    // El brazo en alto sigue VIVO: una respiración mínica alrededor de la pose.
+    this.tweens.add({
+      targets: this.hydeArm,
+      rotation: { from: C.armHoldRad, to: C.armHoldRad + C.armBreatheRad },
+      duration: 1100,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',

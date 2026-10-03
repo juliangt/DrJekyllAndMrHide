@@ -21,6 +21,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   LORE_BACKGROUNDS,
+  NARRATIVE_INTRO_RETOLD_PANELS,
   NARRATIVE_PANEL_LAYOUT,
   NARRATIVE_PANEL_STYLE,
   NARRATIVE_SCENE_LAYOUT,
@@ -30,6 +31,7 @@ import {
   activeLevelFor,
   initialNarrativeState,
   narrativeProgress,
+  narrativeStartIndex,
   panelMaxLines,
   panelTextHeight,
   panelTextLayout,
@@ -49,7 +51,7 @@ import { PALETTE, type HexColor } from '../config/palette';
 import { BASE_HEIGHT, BASE_WIDTH } from '../config/dimensions';
 import { MIN_TOUCH_HEIGHT, type ButtonLayout } from '../ui/buttonState';
 
-const { Tap, Skip } = NarrativeAction;
+const { Tap, Skip, Back } = NarrativeAction;
 
 /** Palabras de un texto (misma métrica que levels.test). */
 function wordCount(text: string): number {
@@ -143,6 +145,70 @@ describe('narrativeProgress — máquina de progresión de paneles', () => {
   it('total inválido (0 o negativo) se clampa a 1', () => {
     expect(initialNarrativeState(0).total).toBe(1);
     expect(initialNarrativeState(-3).total).toBe(1);
+  });
+
+  it('back (flecha «atrás»): retrocede un panel sin tocar done', () => {
+    let state = initialNarrativeState(4);
+    state = narrativeProgress(state, Tap);
+    state = narrativeProgress(state, Tap);
+    state = narrativeProgress(state, Back);
+    expect(state).toEqual({ index: 1, total: 4, done: false });
+  });
+
+  it('back en el PRIMER panel: idempotente (no hay «antes del primero»)', () => {
+    let state = initialNarrativeState(4);
+    state = narrativeProgress(state, Back);
+    state = narrativeProgress(state, Back);
+    expect(state).toEqual({ index: 0, total: 4, done: false });
+  });
+
+  it('back tras done: no hace nada (idempotente como toda acción con done)', () => {
+    let state = initialNarrativeState(4);
+    for (let i = 0; i < 3; i++) {
+      state = narrativeProgress(state, Tap);
+    }
+    state = narrativeProgress(state, Tap); // done
+    state = narrativeProgress(state, Back);
+    expect(state).toEqual({ index: 3, total: 4, done: true });
+  });
+
+  it('adelante y atrás alternados recorren los paneles sin salir de rango', () => {
+    let state = initialNarrativeState(4);
+    state = narrativeProgress(state, Tap);
+    state = narrativeProgress(state, Tap);
+    state = narrativeProgress(state, Back);
+    state = narrativeProgress(state, Tap);
+    state = narrativeProgress(state, Tap);
+    expect(state.index).toBe(3);
+    expect(state.done).toBe(false);
+  });
+
+  it('estado inicial con startIndex: la intro salta los paneles que YA contó', () => {
+    // La cinemática reproduce los paneles 1–3 del Nivel 1: desde la intro se
+    // arranca en el 4 («Es hora del susto»); el indicador lo deja claro.
+    expect(initialNarrativeState(4, narrativeStartIndex(true, 4))).toEqual({
+      index: 3,
+      total: 4,
+      done: false,
+    });
+  });
+});
+
+describe('narrativeStartIndex — arranque de la narrativa según el origen', () => {
+  it('sin intro: arranca en el primer panel (el libro completo)', () => {
+    expect(narrativeStartIndex(false, 4)).toBe(0);
+    expect(narrativeStartIndex(false, 1)).toBe(0);
+  });
+
+  it('desde la intro: salta los paneles que la cinemática ya contó (1–3)', () => {
+    expect(narrativeStartIndex(true, 4)).toBe(NARRATIVE_INTRO_RETOLD_PANELS);
+    expect(narrativeStartIndex(true, 4)).toBe(3);
+  });
+
+  it('NUNCA sale del rango: con menos paneles que los contados, cae en el último', () => {
+    expect(narrativeStartIndex(true, 1)).toBe(0);
+    expect(narrativeStartIndex(true, 3)).toBe(2);
+    expect(narrativeStartIndex(true, 0)).toBe(0);
   });
 });
 
@@ -439,6 +505,24 @@ describe('NARRATIVE_SCENE_LAYOUT — composición de la escena', () => {
     expect(progress.y).toBeGreaterThan(0);
     expect(progress.y).toBeLessThan(200);
   });
+
+  it('las flechas del costado caen a CADA lado, en la banda sobre el panel (táctil ≥ 64 px)', () => {
+    const { nav, panelCenter, depths } = NARRATIVE_SCENE_LAYOUT;
+    // Una a cada costado, simétricas respecto del centro.
+    expect(nav.marginX).toBeGreaterThan(0);
+    expect(nav.marginX).toBeLessThan(BASE_WIDTH / 2 - 32);
+    // En la banda del fondo: bajo la UI superior, sobre el borde del panel.
+    expect(nav.y).toBeGreaterThan(200);
+    expect(nav.y).toBeLessThan(panelCenter.y - NARRATIVE_PANEL_LAYOUT.panelHeight / 2);
+    // Escala 0.9 sobre la textura 64×96 ≈ 86 px de alto (táctil ≥ 64 px).
+    expect(nav.scale * 96).toBeGreaterThanOrEqual(MIN_TOUCH_HEIGHT);
+    expect(nav.disabledAlpha).toBeGreaterThanOrEqual(0);
+    expect(nav.disabledAlpha).toBeLessThan(0.5);
+    expect(nav.pressedScale).toBeGreaterThan(0);
+    expect(nav.pressedScale).toBeLessThan(1);
+    // La flecha vive con la UI (encima del panel y de la capa de tap).
+    expect(depths.ui).toBeGreaterThan(depths.panel);
+  });
 });
 
 describe('LORE_BACKGROUNDS — tabla de fondos por viñeta', () => {
@@ -465,6 +549,25 @@ describe('LORE_BACKGROUNDS — tabla de fondos por viñeta', () => {
   it('cada fondo declara un color base de la paleta', () => {
     for (const [type, def] of entries) {
       expect(paletteValues.has(def.backgroundColor), `${type}.backgroundColor`).toBe(true);
+    }
+  });
+
+  it('los exteriores tienen ESTRELLAS en la banda de cielo; el laboratorio (interior) no', () => {
+    expect(LORE_BACKGROUNDS.street.stars?.length ?? 0).toBeGreaterThanOrEqual(5);
+    expect(LORE_BACKGROUNDS.alley.stars?.length ?? 0).toBeGreaterThanOrEqual(5);
+    expect(LORE_BACKGROUNDS.lab.stars).toBeUndefined();
+    for (const [type, def] of entries) {
+      for (const star of def.stars ?? []) {
+        // Dentro del lienzo y arriba de las siluetas (banda de cielo).
+        expect(star.x, `${type} star.x`).toBeGreaterThan(0);
+        expect(star.x, `${type} star.x`).toBeLessThan(BASE_WIDTH);
+        expect(star.y, `${type} star.y`).toBeGreaterThan(0);
+        expect(star.y, `${type} star.y`).toBeLessThan(400);
+        expect(star.scale, `${type} star.scale`).toBeGreaterThan(0);
+        // Alfa base del titileo: visible pero tenue (no strobo).
+        expect(star.alpha, `${type} star.alpha`).toBeGreaterThan(0);
+        expect(star.alpha, `${type} star.alpha`).toBeLessThanOrEqual(1);
+      }
     }
   });
 
