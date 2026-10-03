@@ -56,8 +56,8 @@ function makeRecordingGraphics(): { g: Parameters<TextureDef['draw']>[0]; calls:
 const PALETTE_NUMBERS = new Set<number>(Object.values(PALETTE).map((hex) => hexToNumber(hex)));
 
 describe('TEXTURE_DEFS — invariants del registro', () => {
-  it('tiene las 13 texturas (hornadas 1 + 2 + 3 + 4)', () => {
-    expect(TEXTURE_DEFS.length).toBe(13);
+  it('tiene las 14 texturas (hornadas 1 + 2 + 3 + 4 + 5)', () => {
+    expect(TEXTURE_DEFS.length).toBe(14);
   });
 
   it('claves únicas', () => {
@@ -125,8 +125,14 @@ describe('TEXTURE_DEFS — invariants del registro', () => {
 
   it('la 4ª hornada (Etapa 4): la niña del minijuego', () => {
     const keys = TEXTURE_DEFS.map((def) => def.key);
-    expect(keys.slice(12)).toEqual([TEXTURE_KEYS.girl]);
+    expect(keys.slice(12, 13)).toEqual([TEXTURE_KEYS.girl]);
     expect(TEXTURE_KEYS.girl).toBe('girl');
+  });
+
+  it('la 5ª hornada (Etapa 6): sello de cera púrpura del diploma', () => {
+    const keys = TEXTURE_DEFS.map((def) => def.key);
+    expect(keys.slice(13)).toEqual([TEXTURE_KEYS.waxSeal]);
+    expect(TEXTURE_KEYS.waxSeal).toBe('wax-seal');
   });
 });
 
@@ -325,5 +331,40 @@ describe('TEXTURE_DEFS — dibujos con Graphics de grabación', () => {
         (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.buildings),
       ),
     ).toBe(true);
+  });
+
+  it('el sello de cera (Etapa 6): disco púrpura irregular + relieve + brillo', () => {
+    const def = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.waxSeal);
+    expect(def).toBeDefined();
+    const { g, calls } = makeRecordingGraphics();
+    def?.draw(g);
+    // Disco principal + 8 bultos del rim + sombra + 2 luces: ≥ 10 círculos.
+    expect(calls.filter((c) => c.method === 'fillCircle').length).toBeGreaterThanOrEqual(10);
+    // La cera es púrpura poción (SPEC §7.1) y el relieve/brillo usan
+    // edificios (sombra) y texto principal (brillo).
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.potionPurple),
+      ),
+    ).toBe(true);
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.buildings),
+      ),
+    ).toBe(true);
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.textPrimary),
+      ),
+    ).toBe(true);
+    // Relieve grabado: anillo circunscrito (strokeCircle) + frasco (fillRect).
+    expect(calls.some((c) => c.method === 'strokeCircle')).toBe(true);
+    expect(calls.some((c) => c.method === 'fillRect')).toBe(true);
+    // El brillo de la cera son DOS luces concéntricas de distinta intensidad.
+    const shineCalls = calls.filter(
+      (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.textPrimary),
+    );
+    expect(shineCalls.length).toBe(2);
+    expect(shineCalls[0].args[1]).not.toBe(shineCalls[1].args[1]); // alfas distintos
   });
 });
