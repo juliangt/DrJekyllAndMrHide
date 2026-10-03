@@ -8,12 +8,16 @@
  * solo importa Phaser como TIPO y los helpers (`transitionTo`, `wipeTo`)
  * se ejercitan con fakes estructurales en tests y en el navegador.
  *
- * Grafo (SPEC §3):
+ * Grafo (SPEC §3, con la intro pre-nivel de la cinemática):
  *
- *   BOOT → PRELOAD → MENU → NARRATIVE → ACTION → QUIZ ─✔→ VICTORY → MENU
- *                        ▲        timeout│  │            │
- *                        └── ✘ (D5) ──────┘  └─ ✘ → NARRATIVE (reinicio nivel)
- *                                  ACTION ← GAME_OVER (overlay «Reintentar»)
+ *   BOOT → PRELOAD → MENU → INTRO → NARRATIVE → ACTION → QUIZ ─✔→ VICTORY → MENU
+ *                                ▲        timeout│  │            │
+ *                                └── ✘ (D5) ──────┘  └─ ✘ → NARRATIVE (reinicio nivel)
+ *                                          ACTION ← GAME_OVER (overlay «Reintentar»)
+ *
+ * NOTA — la intro SOLO se reproduce saliendo del menú (MENU → INTRO, «antes
+ * de arrancar el primer nivel»): las aristas alternativas NO cambian — el
+ * quiz fallido sigue yendo DIRECTO a NARRATIVE sin reproducirla.
  */
 
 import type Phaser from 'phaser';
@@ -36,7 +40,8 @@ import { SceneKey, type SceneKey as SceneKeyType } from '../config/sceneKeys';
 export const NEXT_SCENE: Readonly<Record<SceneKeyType, SceneKeyType>> = {
   [SceneKey.BOOT]: SceneKey.PRELOAD,
   [SceneKey.PRELOAD]: SceneKey.MENU,
-  [SceneKey.MENU]: SceneKey.NARRATIVE,
+  [SceneKey.MENU]: SceneKey.INTRO, // la intro solo se ve al salir del menú
+  [SceneKey.INTRO]: SceneKey.NARRATIVE, // fin de la cinemática → narrativa del N1
   [SceneKey.NARRATIVE]: SceneKey.ACTION,
   [SceneKey.ACTION]: SceneKey.QUIZ, // meta 3/3 alcanzada
   [SceneKey.GAME_OVER]: SceneKey.ACTION, // «Reintentar»: SOLO el minijuego

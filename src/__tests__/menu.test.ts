@@ -67,11 +67,11 @@ describe('menuButtonsFor — qué botones mostrar (SPEC §6/§11)', () => {
     expect(labels).toEqual(['Comenzar el viaje', 'Cómo jugar', 'Continuar']);
   });
 
-  it('«Comenzar» y «Continuar» navegan a NARRATIVE; «Cómo jugar» no navega', () => {
+  it('«Comenzar» y «Continuar» navegan a INTRO (cinemática pre-nivel); «Cómo jugar» no navega', () => {
     const buttons = menuButtonsFor({ inProgress: true });
     const byId = new Map(buttons.map((b) => [b.id, b]));
-    expect(byId.get(MenuButtonId.Start)?.target).toBe(SceneKey.NARRATIVE);
-    expect(byId.get(MenuButtonId.Continue)?.target).toBe(SceneKey.NARRATIVE);
+    expect(byId.get(MenuButtonId.Start)?.target).toBe(SceneKey.INTRO);
+    expect(byId.get(MenuButtonId.Continue)?.target).toBe(SceneKey.INTRO);
     expect(byId.get(MenuButtonId.HowToPlay)?.target).toBeUndefined();
   });
 

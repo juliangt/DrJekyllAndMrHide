@@ -56,8 +56,8 @@ function makeRecordingGraphics(): { g: Parameters<TextureDef['draw']>[0]; calls:
 const PALETTE_NUMBERS = new Set<number>(Object.values(PALETTE).map((hex) => hexToNumber(hex)));
 
 describe('TEXTURE_DEFS — invariants del registro', () => {
-  it('tiene las 14 texturas (hornadas 1 + 2 + 3 + 4 + 5)', () => {
-    expect(TEXTURE_DEFS.length).toBe(14);
+  it('tiene las 16 texturas (hornadas 1 + 2 + 3 + 4 + 5 + intro)', () => {
+    expect(TEXTURE_DEFS.length).toBe(16);
   });
 
   it('claves únicas', () => {
@@ -131,8 +131,18 @@ describe('TEXTURE_DEFS — invariants del registro', () => {
 
   it('la 5ª hornada (Etapa 6): sello de cera púrpura del diploma', () => {
     const keys = TEXTURE_DEFS.map((def) => def.key);
-    expect(keys.slice(13)).toEqual([TEXTURE_KEYS.waxSeal]);
+    expect(keys.slice(13, 14)).toEqual([TEXTURE_KEYS.waxSeal]);
     expect(TEXTURE_KEYS.waxSeal).toBe('wax-seal');
+  });
+
+  it('la 6ª hornada (intro pre-nivel): Jekyll al final, Hyde último', () => {
+    const keys = TEXTURE_DEFS.map((def) => def.key);
+    // Las texturas nuevas se añadieron AL FINAL del registro (los slices por
+    // índice de las hornadas 1–5 siguen intactos).
+    expect(keys.slice(14, 15)).toEqual([TEXTURE_KEYS.jekyll]);
+    expect(keys.slice(15)).toEqual([TEXTURE_KEYS.hyde]);
+    expect(TEXTURE_KEYS.jekyll).toBe('jekyll');
+    expect(TEXTURE_KEYS.hyde).toBe('hyde');
   });
 });
 
@@ -366,5 +376,62 @@ describe('TEXTURE_DEFS — dibujos con Graphics de grabación', () => {
     );
     expect(shineCalls.length).toBe(2);
     expect(shineCalls[0].args[1]).not.toBe(shineCalls[1].args[1]); // alfas distintos
+  });
+
+  it('jekyll (intro): bata clara, copa y matraz con la fórmula verde', () => {
+    const def = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.jekyll);
+    expect(def).toBeDefined();
+    const { g, calls } = makeRecordingGraphics();
+    def?.draw(g);
+    // Bata CLARA de laboratorio (el «antes» elegante de la transformación).
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.parchmentLight),
+      ),
+    ).toBe(true);
+    // Sombrero, cabeza y piernas: la misma silueta oscura de las farolas/niña.
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.buildings),
+      ),
+    ).toBe(true);
+    // La fórmula del matraz es verde laboratorio (resabio de la poción).
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.labGreen),
+      ),
+    ).toBe(true);
+    // Contorno de vidrio (strokePath): el mismo lenguaje que `lab-flask`.
+    expect(calls.some((c) => c.method === 'strokePath')).toBe(true);
+    // Doctor RECTO: torso, sombrero (copa+ala+cinta), botones y piernas.
+    expect(calls.filter((c) => c.method === 'fillRect').length).toBeGreaterThanOrEqual(10);
+  });
+
+  it('hyde (intro): joroba y garras en silueta, ojo verde y aura púrpura sin sangre', () => {
+    const def = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.hyde);
+    expect(def).toBeDefined();
+    const { g, calls } = makeRecordingGraphics();
+    def?.draw(g);
+    // Bestia angulosa: púas de pelo, faldones rotos y garras (triángulos).
+    expect(calls.filter((c) => c.method === 'fillTriangle').length).toBeGreaterThanOrEqual(12);
+    // Joroba/cuerpo redondeado: círculos solapados (silueta encorvada).
+    expect(calls.filter((c) => c.method === 'fillCircle').length).toBeGreaterThanOrEqual(10);
+    // Ojo brillante verde con doble halo (mismo lenguaje que los faroles).
+    const eyeCalls = calls.filter(
+      (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.labGreen),
+    );
+    expect(eyeCalls.length).toBeGreaterThanOrEqual(2);
+    // Resabio de la poción: aura púrpura tenue alrededor de la silueta.
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.potionPurple),
+      ),
+    ).toBe(true);
+    // Inquietante pero NO sangriento (10+): ni un trazo del rojo de error.
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.error),
+      ),
+    ).toBe(false);
   });
 });

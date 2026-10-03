@@ -8,9 +8,10 @@
  *    UnifrakturCook (clave CSS, cargada en PRELOAD) + subtítulo del SPEC §6.
  *  - Botones GothicButton desde `menuButtonsFor(save)`: «Comenzar el viaje»,
  *    «Cómo jugar» y «Continuar» SOLO si `save.inProgress` (SPEC §11).
- *    v1: «Comenzar» y «Continuar» van AMBOS a NARRATIVE (reanudar = narrativa
- *    del N1, SPEC §3); «Comenzar» además marca `inProgress = true` para que
- *    «Continuar» aparezca en la próxima visita (SPEC §11: se guarda al
+ *    v1: «Comenzar» y «Continuar» van AMBOS a INTRO (la cinemática de
+ *    Jekyll → Hyde corre «antes de arrancar el primer nivel» y desemboca en
+ *    la narrativa del N1); «Comenzar» además marca `inProgress = true` para
+ *    que «Continuar» aparezca en la próxima visita (SPEC §11: se guarda al
  *    comenzar nivel).
  *  - Overlay «Cómo jugar» (3 pasos con iconos procedurales, `HOW_TO_PLAY`)
  *    cerrable con botón «Cerrar».
@@ -164,13 +165,15 @@ export class MenuScene extends Phaser.Scene {
     if (id === MenuButtonId.Start) {
       // SPEC §11: guardar al comenzar nivel → «Continuar» visible después.
       beginJourney(saveSystem);
-      // v1: igual destino que «Continuar» (narrativa del N1).
-      transitionTo(this, SceneKey.NARRATIVE);
+      // Ambos arranques pasan por la cinemática de introducción (Jekyll →
+      // Hyde), que a su vez desemboca en la narrativa del N1.
+      transitionTo(this, SceneKey.INTRO);
       return;
     }
     if (id === MenuButtonId.Continue) {
-      // v1: reanudar = narrativa del N1 (sin checkpoint por panel todavía).
-      transitionTo(this, SceneKey.NARRATIVE);
+      // v1: reanudar = ver la intro + narrativa del N1 (sin checkpoint por
+      // panel todavía); la intro es el «antes de arrancar el primer nivel».
+      transitionTo(this, SceneKey.INTRO);
       return;
     }
     if (id === MenuButtonId.HowToPlay) {

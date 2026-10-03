@@ -1,6 +1,7 @@
 /**
  * Etapa 1 — test de la navegación del flujo (SPEC §3) como DATOS PUROS:
- * SceneKey (8 claves, GAME_OVER = overlay), NEXT_SCENE (cadena principal),
+ * SceneKey (9 claves: 8 con archivo + GAME_OVER = overlay), NEXT_SCENE
+ * (cadena principal, con la intro pre-nivel MENU → INTRO → NARRATIVE),
  * ALT_TRANSITIONS (quiz fallo → NARRATIVE, timeout → GAME_OVER) y el
  * registro de escenas de game.config (leído como fuente, como el test de
  * index.html: importar ese módulo cargaría Phaser, imposible en jsdom).
@@ -28,10 +29,10 @@ import type Phaser from 'phaser';
 import { SceneKey } from '../config/sceneKeys';
 import { TEXTURE_KEYS } from '../art/textures';
 
-describe('SceneKey — las 8 claves del flujo (SPEC §3)', () => {
-  it('tiene exactamente BOOT, PRELOAD, MENU, NARRATIVE, ACTION, GAME_OVER, QUIZ, VICTORY', () => {
+describe('SceneKey — las 9 claves del flujo (SPEC §3 + intro pre-nivel)', () => {
+  it('tiene exactamente BOOT, PRELOAD, MENU, INTRO, NARRATIVE, ACTION, GAME_OVER, QUIZ, VICTORY', () => {
     expect(Object.keys(SceneKey).sort()).toEqual(
-      ['ACTION', 'BOOT', 'GAME_OVER', 'MENU', 'NARRATIVE', 'PRELOAD', 'QUIZ', 'VICTORY'].sort(),
+      ['ACTION', 'BOOT', 'GAME_OVER', 'INTRO', 'MENU', 'NARRATIVE', 'PRELOAD', 'QUIZ', 'VICTORY'].sort(),
     );
   });
 
@@ -50,8 +51,12 @@ describe('NEXT_SCENE — cadena principal (SPEC §3)', () => {
     expect(NEXT_SCENE[SceneKey.PRELOAD]).toBe(SceneKey.MENU);
   });
 
-  it('MENU → NARRATIVE', () => {
-    expect(NEXT_SCENE[SceneKey.MENU]).toBe(SceneKey.NARRATIVE);
+  it('MENU → INTRO (la cinemática solo se ve al salir del menú)', () => {
+    expect(NEXT_SCENE[SceneKey.MENU]).toBe(SceneKey.INTRO);
+  });
+
+  it('INTRO → NARRATIVE (fin de la cinemática → narrativa del N1)', () => {
+    expect(NEXT_SCENE[SceneKey.INTRO]).toBe(SceneKey.NARRATIVE);
   });
 
   it('NARRATIVE → ACTION', () => {
@@ -80,10 +85,10 @@ describe('NEXT_SCENE — cadena principal (SPEC §3)', () => {
     }
   });
 
-  it('caminando la cadena desde BOOT se recorre el flujo del SPEC §3', () => {
+  it('caminando la cadena desde BOOT se recorre el flujo del SPEC §3 (con la intro)', () => {
     const path: string[] = [SceneKey.BOOT];
     let current: string = SceneKey.BOOT;
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 7; i++) {
       current = NEXT_SCENE[current as keyof typeof NEXT_SCENE];
       path.push(current);
     }
@@ -91,6 +96,7 @@ describe('NEXT_SCENE — cadena principal (SPEC §3)', () => {
       SceneKey.BOOT,
       SceneKey.PRELOAD,
       SceneKey.MENU,
+      SceneKey.INTRO,
       SceneKey.NARRATIVE,
       SceneKey.ACTION,
       SceneKey.QUIZ,
@@ -400,7 +406,7 @@ describe('wipeTo — fade + cortina de niebla (con fakes)', () => {
 describe('game.config.ts — registro de escenas y escala (leído como fuente)', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/config/game.config.ts'), 'utf8');
 
-  it('registra las 7 escenas con archivo (SPEC §10.2), en orden del flujo', () => {
+  it('registra las 8 escenas con archivo (SPEC §10.2 + intro), en orden del flujo', () => {
     const scenesBlock = source.slice(
       source.indexOf('export const SCENES'),
       source.indexOf('];', source.indexOf('export const SCENES')),
@@ -409,6 +415,7 @@ describe('game.config.ts — registro de escenas y escala (leído como fuente)',
       'BootScene',
       'PreloadScene',
       'MenuScene',
+      'IntroScene',
       'NarrativeScene',
       'ActionScene',
       'QuizScene',

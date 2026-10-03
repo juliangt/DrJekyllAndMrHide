@@ -41,13 +41,15 @@ export interface MenuButtonDescriptor {
 /**
  * Qué botones mostrar (SPEC §6): «Comenzar el viaje» y «Cómo jugar»
  * siempre; «Continuar» SOLO si `save.inProgress === true` (SPEC §11).
+ * Ambos arranques navegan a INTRO: la cinemática (Jekyll → Hyde) corre
+ * «antes de arrancar el primer nivel» y desemboca en la narrativa del N1.
  */
 export function menuButtonsFor(save: { inProgress: boolean }): readonly MenuButtonDescriptor[] {
   const buttons: MenuButtonDescriptor[] = [
     {
       id: MenuButtonId.Start,
       label: 'Comenzar el viaje',
-      target: SceneKey.NARRATIVE,
+      target: SceneKey.INTRO,
     },
     {
       id: MenuButtonId.HowToPlay,
@@ -55,13 +57,13 @@ export function menuButtonsFor(save: { inProgress: boolean }): readonly MenuButt
     },
   ];
   if (save.inProgress) {
-    // v1: «Continuar» reanuda en la narrativa del N1 (mismo destino que
-    // «Comenzar»); cuando exista checkpoint por nivel, el target pasará a
-    // depender del progreso guardado.
+    // v1: «Continuar» reanuda igual que «Comenzar» (intro + narrativa del N1);
+    // cuando exista checkpoint por nivel, el target pasará a depender del
+    // progreso guardado.
     buttons.push({
       id: MenuButtonId.Continue,
       label: 'Continuar',
-      target: SceneKey.NARRATIVE,
+      target: SceneKey.INTRO,
     });
   }
   return buttons;
