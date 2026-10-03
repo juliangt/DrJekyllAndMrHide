@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { GIRL_TEXTURE_KEY, level1 } from '../config/levels/level1';
 import { LEVELS, getLevel } from '../config/levels';
+import { TEXTURE_DEFS, TEXTURE_KEYS } from '../art/textures';
 import type { LoreBackground } from '../config/levels/types';
 
 /** Cuenta palabras de un panel (SPEC §9: máx. ~40). */
@@ -104,6 +105,18 @@ describe('level1 — action: tap-target con los parámetros de SPEC §4.2', () =
   it('texture apunta a la clave planificada de la niña', () => {
     expect(GIRL_TEXTURE_KEY).toBe('girl');
     expect(level1.action.target.texture).toBe('girl');
+  });
+
+  it('wiring config↔art: la textura del objetivo EXISTE en el registro procedural', () => {
+    // Cruz-check directo (auditoría): la clave declarada como DATO en el
+    // nivel debe ser la de la textura generada en BootScene. Si alguien
+    // renombra cualquiera de los dos lados, este test lo detecta aquí y no
+    // como sprite invisible en runtime.
+    expect(level1.action.target.texture).toBe(TEXTURE_KEYS.girl);
+    expect(
+      TEXTURE_DEFS.some((def) => def.key === level1.action.target.texture),
+      `TEXTURE_DEFS no genera la clave "${level1.action.target.texture}"`,
+    ).toBe(true);
   });
 });
 
