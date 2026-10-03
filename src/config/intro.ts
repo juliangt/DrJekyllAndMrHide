@@ -1,8 +1,13 @@
 /**
- * DATOS + LÓGICA PURA de la cinemática de introducción (PLAN fase 1/3):
- * lo que corre ANTES del primer nivel — el Dr. Jekyll bebe su fórmula y se
- * transforma, con animación, en Mr. Hyde. Al terminar se pasa a la narrativa
- * del nivel 1 (`SceneKey.NARRATIVE` con `{ levelId }`).
+ * DATOS + LÓGICA PURA de la cinemática de introducción (PLAN fases 1–2/3):
+ * lo que corre ANTES del primer nivel. ACTO 1 — el Dr. Jekyll bebe su fórmula
+ * y se transforma, con animación, en Mr. Hyde. ACTO 2 — Hyde camina por un
+ * callejón nocturno, aparece una niña con su farol y Hyde la ve, avanza y
+ * ALZA EL BRAZO: amenaza sugerida, jamás contacto (la niña queda «asustada
+ * pero ilesa», lore del quiz del N1). El cierre dirige al JUGADOR («tú eres
+ * Mr. Hyde») para que se entienda que los toques del minijuego los da Hyde.
+ * Al terminar se pasa a la narrativa del nivel 1 (`SceneKey.NARRATIVE` con
+ * `{ levelId }`).
  *
  * Arquitectura data-first (mismo espíritu que `config/narrative.ts`): TODO lo
  * testeable vive aquí, sin Phaser en runtime (jsdom no puede cargarlo) —
@@ -11,11 +16,12 @@
  *  1. Máquina de ACTOS/BEATS: `INTRO_BEATS` es un array ORDENADO de pasos
  *     (`{ id, durationMs, caption }`). La escena entra al beat 0, y cada beat
  *     se auto-avanza al agotarse su duración O por tap en cualquier punto.
- *     Añadir un acto (fase 2: Hyde ve a la niña en el callejón) = añadir
- *     entradas a este array + su "player" en la escena. Nada más.
+ *     Añadir un acto = añadir entradas a este array + su "player" en la
+ *     escena. Nada más.
  *  2. Captions: `INTRO_CAPTIONS` (letreros tipo pergamino, español, tono 10+).
  *  3. Config de animación por beat: `INTRO_ENTRANCE` / `INTRO_DRINK` /
- *     `INTRO_TRANSFORMATION` (duraciones y parámetros de los tweens).
+ *     `INTRO_TRANSFORMATION` (acto 1) e `INTRO_ALLEY_WALK` /
+ *     `INTRO_GIRL_APPEARS` / `INTRO_MENACE` / `INTRO_PLAYER_IS_HYDE` (acto 2).
  *  4. Layout de la escena: `INTRO_SCENE_LAYOUT` (posiciones sobre 720×1280,
  *     profundidades, estilo del letrero — tipografía Crimson Text, SPEC §7.3).
  *  5. Destino: `INTRO_TARGET_LEVEL_ID` (nivel al que se llega tras la intro).
@@ -25,24 +31,33 @@
  */
 
 import { BASE_WIDTH } from './dimensions';
-import { labGreen, potionPurple, textPrimary } from './palette';
+import { fogNear, labGreen, lampFire, potionPurple, textPrimary } from './palette';
 import { TEXTURE_KEYS } from '../art/textures';
 import type { HexColor } from './palette';
 
 // ---- 1. Identidades de los beats (const-object, NO enum) ---------------------
 
 /**
- * Ids de los beats del ACTO 1 (el laboratorio). La fase 2 (acto del callejón:
- * Hyde ve a la niña) añadirá sus ids AQUÍ — el `Record` de players de
- * `IntroScene` exige cubrir cada id, así que el compilador guía la ampliación.
+ * Ids de los beats de la cinemática: el ACTO 1 (el laboratorio) y el ACTO 2
+ * (el callejón: Hyde ve a la niña y la amenaza). El `Record` de players de
+ * `IntroScene` exige cubrir cada id, así que el compilador guía cualquier
+ * ampliación.
  */
 export const IntroBeatId = {
-  /** Jekyll aparece en su laboratorio con el letrero de época. */
+  /** ACTO 1 — Jekyll aparece en su laboratorio con el letrero de época. */
   Entrance: 'entrance',
-  /** Levanta el frasco, bebe y queda la pausa dramática. */
+  /** ACTO 1 — Levanta el frasco, bebe y queda la pausa dramática. */
   Drink: 'drink',
-  /** La transformación: flash, sacudida, niebla y crossfade Jekyll → Hyde. */
+  /** ACTO 1 — La transformación: flash, sacudida, niebla y crossfade Jekyll → Hyde. */
   Transformation: 'transformation',
+  /** ACTO 2 — Hyde cruza el callejón nocturno (fondo troca con velo). */
+  AlleyWalk: 'alleyWalk',
+  /** ACTO 2 — La niña entra por la esquina con su farol encendido. */
+  GirlAppears: 'girlAppears',
+  /** ACTO 2 — Hyde la ve, avanza acechando y ALZA EL BRAZO (sin contacto). */
+  Menace: 'menace',
+  /** ACTO 2 — Cierre: la niebla crece y el letrero dirige al jugador. */
+  PlayerIsHyde: 'playerIsHyde',
 } as const;
 
 export type IntroBeatId = (typeof IntroBeatId)[keyof typeof IntroBeatId];
@@ -55,6 +70,14 @@ export const INTRO_CAPTIONS = {
   entrance: 'Londres, 188X. En su laboratorio, el Dr. Jekyll termina su fórmula…',
   /** Beat de transformación: el remate del acto 1. */
   transformation: '…y deja de ser él.',
+  /** Beat del paseo: retoma el arranque del panel 3 del lore del N1. */
+  alleyWalk: 'Mr. Hyde camina por el callejón. La niebla se pega a sus pasos…',
+  /** Beat de la niña: verbatim del panel 3 del lore (continuidad narrativa). */
+  girlAppears: 'Una niña con farol aparece en la esquina…',
+  /** Beat de amenaza: sugerida, nunca gráfica — el golpe no llega a caer. */
+  menace: 'Hyde la ve. Avanza despacio… y alza el brazo. La niña se encoge, asustada.',
+  /** Cierre: el mensaje CLAVE — quien juega, quien asusta, es Mr. Hyde. */
+  playerIsHyde: 'Y tú eres Mr. Hyde. Es hora del susto.',
 } as const;
 
 /** Un beat de la máquina: duración y letrero del paso (datos puros). */
@@ -74,10 +97,10 @@ export interface IntroBeat {
 }
 
 /**
- * Los beats del ACTO 1 en orden de reproducción. La escena arranca SIEMPRE
- * en el índice 0; el cierre (wipe de niebla → NARRATIVE) se dispara al
- * completarse el ÚLTIMO beat de la tabla — por eso añadir el acto 2 es solo
- * insertar beats aquí (antes o después de los existentes) + su player.
+ * Los beats de la cinemática en orden de reproducción (acto 1: laboratorio;
+ * acto 2: callejón). La escena arranca SIEMPRE en el índice 0; el cierre
+ * (wipe de niebla → NARRATIVE) se dispara al completarse el ÚLTIMO beat de
+ * la tabla — por eso añadir beats es solo insertarlos aquí + su player.
  */
 export const INTRO_BEATS: readonly IntroBeat[] = [
   {
@@ -94,6 +117,26 @@ export const INTRO_BEATS: readonly IntroBeat[] = [
     id: IntroBeatId.Transformation,
     durationMs: 3900,
     caption: INTRO_CAPTIONS.transformation,
+  },
+  {
+    id: IntroBeatId.AlleyWalk,
+    durationMs: 3000,
+    caption: INTRO_CAPTIONS.alleyWalk,
+  },
+  {
+    id: IntroBeatId.GirlAppears,
+    durationMs: 3000,
+    caption: INTRO_CAPTIONS.girlAppears,
+  },
+  {
+    id: IntroBeatId.Menace,
+    durationMs: 3800,
+    caption: INTRO_CAPTIONS.menace,
+  },
+  {
+    id: IntroBeatId.PlayerIsHyde,
+    durationMs: 3400,
+    caption: INTRO_CAPTIONS.playerIsHyde,
   },
 ];
 
@@ -178,6 +221,85 @@ export const INTRO_TRANSFORMATION = {
   },
 } as const;
 
+// ---- 3b. Config de animación del ACTO 2 (el callejón) -----------------------
+
+/**
+ * Beat «AlleyWalk»: troca al callejón (`LORE_BACKGROUNDS.alley`, con velo de
+ * noche) y Hyde CRUZA el escenario de izquierda a derecha — la textura mira
+ * a la derecha, así que entra por la IZQUIERDA sin voltear. Emergiendo de la
+ * niebla (fade-in sobre el velo del trocado de fondo) con vaivén de paso.
+ */
+export const INTRO_ALLEY_WALK = {
+  /** X inicial: fuera del lienzo por la izquierda (mitad de textura ≈ 122 px). */
+  fromX: -140,
+  /** X donde se detiene (centro-izquierda; deja la esquina derecha a la niña). */
+  toX: 280,
+  /** Duración del cruce (ms; Sine.easeInOut). */
+  walkMs: 1900,
+  /** Emergencia de la niebla: fade-in al empezar a andar (ms). */
+  emergeMs: 500,
+  /** Vaivén del paso: bob vertical y balanceo mínimo de rotación. */
+  bob: { px: 7, cycleMs: 560 },
+  rockRad: 0.035,
+} as const;
+
+/**
+ * Beat «GirlAppears»: la niña entra por la DERECHA (la esquina junto a la
+ * única farola del callejón) con su farol encendido — volteada (flipX) para
+ * que la luz quede DEL LADO DE HYDE — y se detiene con el farol temblando.
+ */
+export const INTRO_GIRL_APPEARS = {
+  /** X inicial: fuera del lienzo por la derecha. */
+  fromX: 840,
+  /** Duración de la entrada hasta su marca (ms; Sine.easeOut: llega y frena). */
+  enterMs: 1000,
+  /** Temblor del farol: vaivén sutil de rotación al detenerse. */
+  tremble: { rad: 0.03, cycleMs: 130 },
+  /** Resplandor del farol: puff cálido que respira tras la lámpara. */
+  glow: { color: lampFire, scale: 0.9, alpha: 0.3, breatheMs: 900 },
+} as const;
+
+/**
+ * Beat «Menace»: Hyde la ve (destello verde del ojo), avanza acechando y
+ * ALZA EL BRAZO (rotación negativa = el lado del brazo sube). Amenaza
+ * SUGERIDA, público 10+: el acercamiento NUNCA la alcanza, el golpe nunca
+ * cae y la niña solo se encoge (queda «asustada pero ilesa», lore del quiz).
+ */
+export const INTRO_MENACE = {
+  /** Pausa inicial: Hyde la ve antes de moverse (ms). */
+  seeDelayMs: 520,
+  /**
+   * Destello del ojo (un puff teñido de verde, sube y baja en yoyo):
+   * `durationMs` es el tiempo de CADA tramo (el yoyo completa 2 tramos).
+   */
+  eyeFlare: { color: labGreen, scale: 0.3, durationMs: 320 },
+  /** Acecho: avanza hacia ella acelerando (Quad.easeIn) sin alcanzarla. */
+  lunge: { toX: 415, durationMs: 820 },
+  /** Alza el brazo: rotación parcial (queda a medias, jamás completa el golpe). */
+  armRaise: { rad: -0.55, durationMs: 560 },
+  /** La niña se encoge: retroceso corto tras empezar el acecho. */
+  flinch: { toX: 600, delayMs: 420, durationMs: 300 },
+  /** Temblor de la niña: compresión vertical sutil (se hace pequeña). */
+  tremble: { scaleY: 0.94, cycleMs: 240, repeats: 3 },
+  /** Puffs de niebla que levanta el acecho (tras sus pies, deterministas). */
+  puffs: { count: 2, scale: 0.9, durationMs: 780, staggerMs: 340 },
+} as const;
+
+/**
+ * Beat «PlayerIsHyde»: cierre atmosférico — la niebla crece (velo + puffs),
+ * el letrero final dirige al JUGADOR y, al completarse este beat, el flujo
+ * existente cierra con el wipe hacia NARRATIVE (no se duplica aquí). El
+ * brazo de Hyde queda EN ALTO, relajado un pelín: el golpe nunca cae.
+ */
+export const INTRO_PLAYER_IS_HYDE = {
+  /** Pose congelada del brazo (algo menor que el alzo del acecho). */
+  armHoldRad: -0.5,
+  /** Velo de niebla que espesa la escena (sobre los personajes, bajo el letrero). */
+  veil: { color: fogNear, alpha: 0.32, durationMs: 1600 },
+  /** Puffs de niebla creciendo por toda la escena (la que «lo cubre todo»). */
+  puffs: { count: 5, scale: 2.4, durationMs: 1500, staggerMs: 180 },
+} as const;
+
 // ---- 4. Layout de la escena (sobre el lienzo base 720×1280) ------------------
 
 /**
@@ -189,8 +311,20 @@ export const INTRO_TRANSFORMATION = {
 export const INTRO_SCENE_LAYOUT = {
   /** Centro y escala base de Jekyll/Hyde (delante de la mesa del laboratorio). */
   character: { x: BASE_WIDTH / 2, y: 660, scale: 1.7, depth: 8 },
+  /**
+   * La niña (acto 2): la «esquina» junto a la única farola del callejón,
+   * MÁS PEQUEÑA y MÁS ALTA que Hyde en pantalla (más lejos: profundidad de
+   * escena). Depth entre el velo de trocado (7.5) y los personajes (8): si
+   * llegaran a solaparse, ella queda detrás.
+   */
+  girl: { x: 560, y: 640, scale: 1.25, depth: 7.8 },
   /** Velos de trocado de fondo (fase 2): entre los props (7) y los personajes (8). */
   backgroundVeilDepth: 7.5,
+  /**
+   * Velo de niebla del cierre (acto 2): sobre los personajes (8) y bajo el
+   * letrero (10) — el mensaje final se lee a través de la niebla.
+   */
+  closingVeilDepth: 9,
   /** Letrero pergamino inferior (estilo del panel narrativo, más compacto). */
   caption: {
     x: BASE_WIDTH / 2,
@@ -229,6 +363,7 @@ export const INTRO_TARGET_LEVEL_ID = 1;
 export const INTRO_TEXTURES = {
   jekyll: TEXTURE_KEYS.jekyll,
   hyde: TEXTURE_KEYS.hyde,
+  girl: TEXTURE_KEYS.girl,
   puff: TEXTURE_KEYS.fogPuff,
   halo: TEXTURE_KEYS.fog,
   captionPanel: TEXTURE_KEYS.parchmentFrame,
@@ -238,4 +373,25 @@ export const INTRO_TEXTURES = {
 export function puffTintFor(index: number): HexColor {
   const tints = INTRO_TRANSFORMATION.puffs.tints;
   return tints[index % tints.length] as HexColor;
+}
+
+/**
+ * Puffs unitarios (1 sprite de niebla cada uno): el trago del frasco
+ * (`spawnGulp`), el resplandor del farol y el destello del ojo de Hyde.
+ */
+const SINGLE_PUFF_BEATS = 3;
+
+/**
+ * Presupuesto de niebla de la CINEMÁTICA (SPEC §10.4 ≤ 30): todos los sprites
+ * de niebla transitorios que los players pueden crear en un paseo completo,
+ * para sumar a los slots del fondo vigente (el test de `intro.test.ts` lo
+ * chequea contra el tope).
+ */
+export function introFogSprites(): number {
+  return (
+    INTRO_TRANSFORMATION.puffs.count +
+    SINGLE_PUFF_BEATS +
+    INTRO_MENACE.puffs.count +
+    INTRO_PLAYER_IS_HYDE.puffs.count
+  );
 }
