@@ -221,9 +221,11 @@ export class AudioSystem {
     filter.frequency.exponentialRampToValueAtTime(peakHz, t0 + durationSec * 0.6);
     filter.frequency.exponentialRampToValueAtTime(Math.max(toHz, 1), t0 + durationSec);
     // Envolvente: ataque suave, cuerpo y caída exponencial (nunca click).
+    // Etapa 7: pico 0.5 → 0.42 del master — el viento es AMBIENTE y debe
+    // quedar por debajo de cualquier feedback de UI (blip/thump).
     const gain = ctx.createGain();
     gain.gain.setValueAtTime(0.0001, t0);
-    gain.gain.linearRampToValueAtTime(MASTER_GAIN * 0.5, t0 + durationSec * 0.35);
+    gain.gain.linearRampToValueAtTime(MASTER_GAIN * 0.42, t0 + durationSec * 0.35);
     gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durationSec);
     source.connect(filter);
     filter.connect(gain);
@@ -236,6 +238,10 @@ export class AudioSystem {
    * Tick del timer (SPEC §8: «click corto cada segundo», últimos 5 s de la
    * fase de acción): oscilador triangular agudo, brevísimo y MÁS QUIETO que
    * el resto (suena cada segundo — no debe cansar).
+   *
+   * Etapa 7 (pulido): 0.45 → 0.32 del master — el tick se repite cada
+   * segundo, así que baja AÚN MÁS por debajo del thump del hit (1.2) para
+   * que marque urgencia sin saturar los últimos 5 s.
    */
   tick(durationSec = 0.05, fromHz = 1500, toHz = 900): void {
     const ctx = this.playableContext();
@@ -246,7 +252,7 @@ export class AudioSystem {
     osc.type = 'triangle';
     osc.frequency.setValueAtTime(fromHz, t0);
     osc.frequency.exponentialRampToValueAtTime(Math.max(toHz, 1), t0 + durationSec);
-    gain.gain.setValueAtTime(MASTER_GAIN * 0.45, t0);
+    gain.gain.setValueAtTime(MASTER_GAIN * 0.32, t0);
     gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durationSec);
     osc.connect(gain);
     gain.connect(ctx.destination);
@@ -282,6 +288,10 @@ export class AudioSystem {
    * notas»): tres notas de la tríada mayor de do (C5–E5–G5, 0/4/7 semitonos
    * en temperamento igual) encadenadas a ~90 ms, timbre triangular cálido
    * con decay exponencial por nota — el «premio» sonoro del quiz correcto.
+   *
+   * Etapa 7 (pulido): 0.9 → 0.7 por nota — las tres notas se SOLAPAN
+   * (nota 0.24 s, paso 0.09 s) y la suma llega a ~2× una nota sola;
+   * a 0.9 el pico sonaba estridente. 0.7 lo mantiene alegre sin pinchar.
    */
   arpeggio(noteSec = 0.24, stepSec = 0.09, baseHz = 523.25): void {
     const ctx = this.playableContext();
@@ -294,7 +304,7 @@ export class AudioSystem {
       const gain = ctx.createGain();
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(baseHz * Math.pow(2, semi / 12), start);
-      gain.gain.setValueAtTime(MASTER_GAIN * 0.9, start);
+      gain.gain.setValueAtTime(MASTER_GAIN * 0.7, start);
       gain.gain.exponentialRampToValueAtTime(0.0001, start + noteSec);
       osc.connect(gain);
       gain.connect(ctx.destination);

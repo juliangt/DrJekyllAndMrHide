@@ -122,7 +122,12 @@ describe('VictoryScene — sonido y ciclo de vida', () => {
 describe('nameField — approach DOM sobre el canvas (decision documentada)', () => {
   it('mapea coords de juego a CSS replicando Scale.FIT + CENTER_BOTH', () => {
     expect(nameFieldSource).toContain('export function canvasPointToCss');
-    expect(nameFieldSource).toContain('Math.min(safeRect.width / baseWidth');
+    // Etapa 7: la matemática FIT (mín de razones + letterbox centrado) se
+    // EXTRAJO a ui/fitScale.ts para el QA responsive 320→1920 y nameField
+    // la REUTILIZA — misma matemática, una sola fuente de verdad. Los 26
+    // tests de responsive.test.ts fijan ahora esa propiedad.
+    expect(nameFieldSource).toContain("import { fitScale } from './fitScale'");
+    expect(nameFieldSource).toContain('const fit = fitScale(safeRect.width, safeRect.height, baseWidth, baseHeight)');
   });
 
   it('el input nace oculto y destroy() lo retira del DOM (sin huérfanos al cambiar de escena)', () => {

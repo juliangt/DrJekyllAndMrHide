@@ -465,7 +465,10 @@ export const QUIZ_LAYOUT: QuizLayoutData = {
     color: textPrimary,
   },
   depths: { veil: 20, panel: 30, content: 32, score: 40 },
-  fade: { outMs: 110, inMs: 200, cardLockMs: 700 },
+  // Etapa 7 (pulido): cardLockMs 700 → 800 — tras responder, la pausa con
+  // las tarjetas deshabilitadas deja ver la elección un instante más antes
+  // del cambio de vista (feedback pedagógico sin prisa, SPEC §9).
+  fade: { outMs: 110, inMs: 200, cardLockMs: 800 },
   minTopY: 130,
   bottomMargin: 40,
 };
