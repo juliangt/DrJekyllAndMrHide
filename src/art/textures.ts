@@ -75,6 +75,8 @@ export const TEXTURE_KEYS = {
   labFlask: 'lab-flask',
   /** La niña: silueta pequeña con farol iluminado (objetivo N1, SPEC §7.2). */
   girl: 'girl',
+  /** Sello de cera púrpura del diploma de victoria (Etapa 6, SPEC §6). */
+  waxSeal: 'wax-seal',
 } as const;
 
 /**
@@ -414,11 +416,62 @@ function drawGirl(g: Phaser.GameObjects.Graphics): void {
   g.fillCircle(72, 92, 6); // núcleo
 }
 
+// ---- Texturas de la Etapa 6 (diploma de victoria, SPEC §6/§7.2) --------------
+
+/**
+ * Sello de cera púrpura del diploma (SPEC §6, acento potionPurple de la
+ * paleta): disco con borde IRREGULAR (bultos deterministas alrededor del
+ * rim, como cera vertida), sombra interior inferior, anillo y frasco en
+ * relieve (tinta oscura, alpha bajo) y brillo de cera (dos luces suaves).
+ * Determinista: mismo sello en cada boot.
+ */
+function drawWaxSeal(g: Phaser.GameObjects.Graphics): void {
+  const wax = hexToNumber(potionPurple);
+  const shade = hexToNumber(buildings);
+  const shine = hexToNumber(textPrimary);
+
+  // Disco principal de cera.
+  g.fillStyle(wax, 1);
+  g.fillCircle(64, 64, 44);
+  // Borde irregular: 8 bultos deterministas alrededor del rim (cera vertida).
+  const bumps: ReadonlyArray<{ x: number; y: number; r: number }> = [
+    { x: 104, y: 64, r: 8 },
+    { x: 92, y: 92, r: 9 },
+    { x: 64, y: 104, r: 7 },
+    { x: 36, y: 92, r: 9 },
+    { x: 24, y: 64, r: 8 },
+    { x: 36, y: 36, r: 9 },
+    { x: 64, y: 26, r: 7 },
+    { x: 92, y: 36, r: 9 },
+  ];
+  for (const b of bumps) {
+    g.fillCircle(b.x, b.y, b.r);
+  }
+
+  // Sombra interior (el relieve de la cera se hunde hacia abajo).
+  g.fillStyle(shade, 0.22);
+  g.fillCircle(64, 72, 36);
+
+  // Relieve: anillo perimetral + frasco grabado en el centro.
+  g.lineStyle(5, shade, 0.5);
+  g.strokeCircle(64, 62, 26);
+  g.fillStyle(shade, 0.5);
+  g.fillTriangle(56, 50, 72, 50, 64, 66); // cuerpo cónico del frasco
+  g.fillRect(60, 42, 8, 10); // cuello
+  g.fillCircle(64, 70, 4); // base
+
+  // Brillo de la cera: dos luces suaves arriba a la izquierda.
+  g.fillStyle(shine, 0.15);
+  g.fillCircle(46, 42, 17);
+  g.fillStyle(shine, 0.3);
+  g.fillCircle(44, 40, 9);
+}
+
 /**
  * Registro de texturas: primera hornada (PLAN Etapa 1) + iconos de la
  * Etapa 2 («Cómo jugar» y toggle de mute) + fondo «lab» de la Etapa 3 +
- * la niña de la Etapa 4. Hornadas futuras (Hyde, sello de cera…) se
- * añaden aquí o en registros posteriores.
+ * la niña de la Etapa 4 + el sello de cera de la Etapa 6. Hornadas futuras
+ * (Hyde…) se añaden aquí o en registros posteriores.
  */
 export const TEXTURE_DEFS: readonly TextureDef[] = [
   {
@@ -512,6 +565,13 @@ export const TEXTURE_DEFS: readonly TextureDef[] = [
     height: 176,
     description: 'La niña: silueta pequeña con farol iluminado (objetivo del minijuego N1).',
     draw: drawGirl,
+  },
+  {
+    key: TEXTURE_KEYS.waxSeal,
+    width: 128,
+    height: 128,
+    description: 'Sello de cera púrpura del diploma de victoria (borde irregular y brillo).',
+    draw: drawWaxSeal,
   },
 ];
 

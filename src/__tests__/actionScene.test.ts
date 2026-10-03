@@ -77,10 +77,10 @@ describe('ActionScene — ciclo de la tanda (SPEC §4.2/§5)', () => {
     expect(timeoutBlock.indexOf('overlay.setVisible(true)')).toBeGreaterThan(-1);
   });
 
-  it('el bonus de tiempo se suma UNA vez al lograr la meta', () => {
+  it('el bonus de tiempo se suma UNA vez al lograr la meta (en su categoría, Etapa 6)', () => {
     const goalBlock = source.slice(source.indexOf('onGoal()'));
     expect(goalBlock.indexOf('timeBonus(this.state.timeLeftMs)')).toBeGreaterThan(-1);
-    expect(goalBlock.indexOf('scoreSystem.add(bonus)')).toBeGreaterThan(-1);
+    expect(goalBlock.indexOf('scoreSystem.add(bonus, SCORE_CATEGORY.timeBonus)')).toBeGreaterThan(-1);
   });
 });
 

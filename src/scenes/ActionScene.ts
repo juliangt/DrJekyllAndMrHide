@@ -40,6 +40,7 @@ import { TEXTURE_KEYS } from '../art/textures';
 import { ACTION_PARALLAX_LAYERS } from '../art/parallax';
 import { ParallaxField } from '../art/ParallaxField';
 import { getSystems } from '../systems/getSystems';
+import { SCORE_CATEGORY } from '../systems/ScoreSystem';
 import type { AudioSystem } from '../systems/AudioSystem';
 import type { SaveSystem } from '../systems/SaveSystem';
 import type { ScoreSystem } from '../systems/ScoreSystem';
@@ -344,7 +345,7 @@ export class ActionScene extends Phaser.Scene {
   private onHit(): void {
     const next = actionReducer(this.state, { type: ActionEventType.Hit });
     this.state = next;
-    this.systems.scoreSystem.add(TAP_POINTS); // +10 (SPEC §5)
+    this.systems.scoreSystem.add(TAP_POINTS, SCORE_CATEGORY.taps); // +10 (SPEC §5)
     this.hud.setHits(next.hits);
 
     // Feedback (SPEC §4.2/§7.2): flash blanco + micro-shake + «!» + «+10»
@@ -379,7 +380,7 @@ export class ActionScene extends Phaser.Scene {
     // Bonus por tiempo restante: 2 pts/s con floor (se suma UNA vez).
     const bonus = timeBonus(this.state.timeLeftMs);
     if (bonus > 0) {
-      this.systems.scoreSystem.add(bonus);
+      this.systems.scoreSystem.add(bonus, SCORE_CATEGORY.timeBonus);
       this.floatText(`+${bonus}`, BASE_WIDTH / 2, BASE_HEIGHT / 2 - 60, ACTION_FLOAT_STYLE.points, -44);
     }
 

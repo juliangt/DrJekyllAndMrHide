@@ -2,9 +2,19 @@
  * Etapa 1 — test del ScoreSystem (SPEC §5): inicio en 0, incrementos,
  * evento `score:change` con payload, rechazo de valores no válidos
  * (negativos / 0 / no finitos — criterio documentado en el módulo) y reset.
+ *
+ * Etapa 6 — extensión DESGLOSE POR CATEGORÍA (SPEC §6 «puntaje final
+ * desglosado»): `add(points, category?)` acumula también en la cubeta de la
+ * categoría (`getBreakdown()`), `reset()` limpia total Y cubetas, y la API
+ * vieja `add(points)` sin categoría NO se rompe (suma al total, cubetas a 0).
  */
 import { describe, expect, it, vi } from 'vitest';
-import { SCORE_CHANGE_EVENT, ScoreSystem, type ScoreChangePayload } from '../systems/ScoreSystem';
+import {
+  SCORE_CATEGORY,
+  SCORE_CHANGE_EVENT,
+  ScoreSystem,
+  type ScoreChangePayload,
+} from '../systems/ScoreSystem';
 
 describe('ScoreSystem — estado inicial', () => {
   it('arranca en 0', () => {
@@ -116,5 +126,99 @@ describe('ScoreSystem — evento score:change', () => {
 
   it('el nombre del evento es score:change', () => {
     expect(SCORE_CHANGE_EVENT).toBe('score:change');
+  });
+});
+
+describe('ScoreSystem — desglose por categoría (Etapa 6, SPEC §6)', () => {
+  it('arranca con las tres cubetas a 0', () => {
+    const score = new ScoreSystem();
+    expect(score.getBreakdown()).toEqual({ taps: 0, timeBonus: 0, quiz: 0 });
+  });
+
+  it('add(points, category) acumula en la cubeta de la categoría', () => {
+    const score = new ScoreSystem();
+    score.add(10, SCORE_CATEGORY.taps);
+    score.add(10, SCORE_CATEGORY.taps);
+    score.add(10, SCORE_CATEGORY.taps);
+    expect(score.getBreakdown().taps).toBe(30);
+    expect(score.getBreakdown().quiz).toBe(0);
+
+    score.add(100, SCORE_CATEGORY.quiz);
+    expect(score.getBreakdown().quiz).toBe(100);
+
+    score.add(40, SCORE_CATEGORY.timeBonus);
+    expect(score.getBreakdown().timeBonus).toBe(40);
+
+    // El total sigue siendo la fuente de verdad.
+    expect(score.getScore()).toBe(170);
+  });
+
+  it('el desglose de una tanda completa cuadra con el CA (30 + 100 + 40 = 170)', () => {
+    const score = new ScoreSystem();
+    score.add(10, SCORE_CATEGORY.taps);
+    score.add(10, SCORE_CATEGORY.taps);
+    score.add(10, SCORE_CATEGORY.taps);
+    score.add(40, SCORE_CATEGORY.timeBonus);
+    score.add(100, SCORE_CATEGORY.quiz);
+    expect(score.getBreakdown()).toEqual({ taps: 30, timeBonus: 40, quiz: 100 });
+    const total = Object.values(score.getBreakdown()).reduce((sum, n) => sum + n, 0);
+    expect(total).toBe(score.getScore());
+    expect(total).toBe(170);
+  });
+
+  it('getBreakdown devuelve una COPIA: mutarla no toca el estado interno', () => {
+    const score = new ScoreSystem();
+    score.add(10, SCORE_CATEGORY.taps);
+    const breakdown = score.getBreakdown();
+    breakdown.taps = 999;
+    expect(score.getBreakdown().taps).toBe(10);
+  });
+
+  it('los valores rechazados (≤ 0 / no finitos) tampoco tocan la cubeta', () => {
+    const score = new ScoreSystem();
+    expect(score.add(-10, SCORE_CATEGORY.taps)).toBe(0);
+    expect(score.add(0, SCORE_CATEGORY.taps)).toBe(0);
+    expect(score.add(Number.NaN, SCORE_CATEGORY.quiz)).toBe(0);
+    expect(score.getBreakdown()).toEqual({ taps: 0, timeBonus: 0, quiz: 0 });
+    expect(score.getScore()).toBe(0);
+  });
+
+  it('COMPATIBILIDAD API vieja: add(points) sin categoría suma al total sin tocar cubetas', () => {
+    const score = new ScoreSystem();
+    expect(score.add(10)).toBe(10);
+    expect(score.getScore()).toBe(10);
+    expect(score.getBreakdown()).toEqual({ taps: 0, timeBonus: 0, quiz: 0 });
+  });
+
+  it('una categoría desconocida (basura en runtime) suma al total, no al desglose', () => {
+    const score = new ScoreSystem();
+    const bogus = 'mist' as unknown as typeof SCORE_CATEGORY.taps;
+    expect(score.add(50, bogus)).toBe(50);
+    expect(score.getScore()).toBe(50);
+    expect(score.getBreakdown()).toEqual({ taps: 0, timeBonus: 0, quiz: 0 });
+  });
+
+  it('reset limpia el total Y las cubetas (descarte de tanda D5 / Jugar de nuevo)', () => {
+    const score = new ScoreSystem();
+    score.add(30, SCORE_CATEGORY.taps);
+    score.add(40, SCORE_CATEGORY.timeBonus);
+    score.add(100, SCORE_CATEGORY.quiz);
+    score.reset();
+    expect(score.getScore()).toBe(0);
+    expect(score.getBreakdown()).toEqual({ taps: 0, timeBonus: 0, quiz: 0 });
+  });
+
+  it('el payload de score:change NO cambia (score + delta, sin desglose)', () => {
+    const score = new ScoreSystem();
+    const events: ScoreChangePayload[] = [];
+    score.onChange((payload) => events.push(payload));
+    score.add(10, SCORE_CATEGORY.taps);
+    expect(events).toEqual([{ score: 10, delta: 10 }]);
+  });
+
+  it('las tres categorías del desglose son taps / timeBonus / quiz (valores = claves de la cubeta)', () => {
+    expect(SCORE_CATEGORY.taps).toBe('taps');
+    expect(SCORE_CATEGORY.timeBonus).toBe('timeBonus');
+    expect(SCORE_CATEGORY.quiz).toBe('quiz');
   });
 });

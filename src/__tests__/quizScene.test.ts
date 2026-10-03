@@ -71,13 +71,13 @@ describe('QuizScene — consume los módulos PUROS (arquitectura Etapa 5)', () =
 });
 
 describe('QuizScene — rama correcta (SPEC §4.3/§5/§8: +100 → arpegio → historia → VICTORY)', () => {
-  it('Select con acierto: scoreSystem.add(QUIZ_POINTS) (+100) + arpeggio()', () => {
+  it('Select con acierto: scoreSystem.add(QUIZ_POINTS, quiz) (+100) + arpeggio()', () => {
     const selectBlock = quizSource.slice(quizSource.indexOf('private onSelect('));
     expect(selectBlock.indexOf('next.phase === QuizPhase.Story')).toBeGreaterThan(-1);
-    expect(selectBlock.indexOf('scoreSystem.add(QUIZ_POINTS)')).toBeGreaterThan(-1);
+    expect(selectBlock.indexOf('scoreSystem.add(QUIZ_POINTS, SCORE_CATEGORY.quiz)')).toBeGreaterThan(-1);
     expect(selectBlock.indexOf('audioSystem.arpeggio()')).toBeGreaterThan(-1);
     // El +100 lo aplica la escena ANTES del arpegio (orden del SPEC: +100 → arpegio).
-    expect(selectBlock.indexOf('scoreSystem.add(QUIZ_POINTS)')).toBeLessThan(
+    expect(selectBlock.indexOf('scoreSystem.add(QUIZ_POINTS, SCORE_CATEGORY.quiz)')).toBeLessThan(
       selectBlock.indexOf('audioSystem.arpeggio()'),
     );
   });

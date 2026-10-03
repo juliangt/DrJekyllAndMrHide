@@ -29,6 +29,7 @@ import { activeLevelFor } from '../config/narrative';
 import { hexToNumber, nightBackground } from '../config/palette';
 import { SceneKey } from '../config/sceneKeys';
 import { getSystems } from '../systems/getSystems';
+import { SCORE_CATEGORY } from '../systems/ScoreSystem';
 import type { AudioSystem } from '../systems/AudioSystem';
 import type { SaveSystem } from '../systems/SaveSystem';
 import type { ScoreSystem } from '../systems/ScoreSystem';
@@ -388,7 +389,7 @@ export class QuizScene extends Phaser.Scene {
     if (next.phase === QuizPhase.Story) {
       // Acierto: +100 (SPEC §5/§4.3) + arpegio mayor (SPEC §8). El HUD se
       // refresca solo por el evento `score:change` del ScoreSystem.
-      this.systems.scoreSystem.add(QUIZ_POINTS);
+      this.systems.scoreSystem.add(QUIZ_POINTS, SCORE_CATEGORY.quiz);
       this.systems.audioSystem.arpeggio();
     } else {
       // Fallo: intervalo menor descendente suave (SPEC §8).
