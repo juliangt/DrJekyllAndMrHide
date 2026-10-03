@@ -444,3 +444,107 @@ describe('AudioSystem — wind (sweep de ruido filtrado low-pass, SPEC §8)', ()
     expect(ctx.sources[0].stoppedAt).toBeCloseTo(ctx.currentTime + 1, 5);
   });
 });
+
+describe('AudioSystem — tick (click corto del timer, SPEC §8/Etapa 4)', () => {
+  it('sin unlock es no-op (no crea fuentes)', () => {
+    const { audio, ctx } = makeSystem();
+    audio.tick();
+    expect(ctx.oscillators.length).toBe(0);
+    expect(ctx.gains.length).toBe(0);
+  });
+
+  it('con mute activo no crea ninguna fuente', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.setMuted(true);
+    audio.tick();
+    expect(ctx.oscillators.length).toBe(0);
+  });
+
+  it('click corto: oscilador triangular agudo, MÁS QUIETO, agendado', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.tick();
+
+    expect(ctx.oscillators.length).toBe(1);
+    expect(ctx.gains.length).toBe(1);
+    const osc = ctx.oscillators[0];
+    const gain = ctx.gains[0];
+
+    expect(osc.type).toBe('triangle');
+    const [fromHz] = osc.frequency.setValueAtTimeCalls[0];
+    const [toHz] = osc.frequency.exponentialRampCalls[0];
+    expect(fromHz).toBeGreaterThanOrEqual(1000); // agudo (click)
+    expect(toHz).toBeLessThan(fromHz); // pitch descendente corto
+    // Corto por defecto (0.05 s): un tick por segundo no cansa.
+    expect(osc.stoppedAt).toBeCloseTo(ctx.currentTime + 0.05, 5);
+    // Volumen por debajo del MASTER (suena cada segundo).
+    const [gainStart] = gain.gain.setValueAtTimeCalls[0];
+    expect(gainStart).toBeLessThanOrEqual(0.25 * 0.6);
+    expect(gain.connectCalls[0]).toBe(ctx.destination);
+  });
+
+  it('respeta duración y frecuencias personalizadas', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.tick(0.2, 900, 500);
+    expect(ctx.oscillators[0].frequency.setValueAtTimeCalls[0]).toEqual([
+      900,
+      ctx.currentTime,
+    ]);
+    expect(ctx.oscillators[0].stoppedAt).toBeCloseTo(ctx.currentTime + 0.2, 5);
+  });
+});
+
+describe('AudioSystem — timeout (tono grave sostenido con decay, SPEC §8/Etapa 4)', () => {
+  it('sin unlock y con mute es no-op', () => {
+    const a = makeSystem();
+    a.audio.timeout();
+    expect(a.ctx.oscillators.length).toBe(0);
+    const b = makeSystem();
+    b.audio.unlock();
+    b.audio.setMuted(true);
+    b.audio.timeout();
+    expect(b.ctx.oscillators.length).toBe(0);
+  });
+
+  it('seno grave que desciende, con ataque corto y caída exponencial', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.timeout();
+
+    expect(ctx.oscillators.length).toBe(1);
+    const osc = ctx.oscillators[0];
+    const gain = ctx.gains[0];
+
+    expect(osc.type).toBe('sine');
+    const [fromHz] = osc.frequency.setValueAtTimeCalls[0];
+    const [toHz] = osc.frequency.exponentialRampCalls[0];
+    expect(fromHz).toBeLessThanOrEqual(300); // grave
+    expect(toHz).toBeLessThan(fromHz); // desciende
+    // Sostenido (~1.1 s por defecto) — no es un click.
+    expect(osc.stoppedAt).toBeCloseTo(ctx.currentTime + 1.1, 5);
+    // Envolvente: arranque desde casi 0 (ataque lineal corto) → decay exp.
+    const [attackFrom] = gain.gain.setValueAtTimeCalls[0];
+    expect(attackFrom).toBeLessThanOrEqual(0.001);
+    expect(gain.gain.linearRampCalls.length).toBe(1);
+    expect(gain.gain.exponentialRampCalls.length).toBe(1);
+    const [peak] = gain.gain.linearRampCalls[0];
+    expect(peak).toBeGreaterThan(0);
+    // Cadena y agenda.
+    expect(osc.connectCalls[0]).toBe(gain);
+    expect(gain.connectCalls[0]).toBe(ctx.destination);
+    expect(osc.startedAt).toBe(ctx.currentTime);
+  });
+
+  it('respeta duración y frecuencias personalizadas', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.timeout(2, 150, 40);
+    expect(ctx.oscillators[0].frequency.setValueAtTimeCalls[0]).toEqual([
+      150,
+      ctx.currentTime,
+    ]);
+    expect(ctx.oscillators[0].stoppedAt).toBeCloseTo(ctx.currentTime + 2, 5);
+  });
+});

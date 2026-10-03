@@ -233,6 +233,51 @@ export class AudioSystem {
   }
 
   /**
+   * Tick del timer (SPEC §8: «click corto cada segundo», últimos 5 s de la
+   * fase de acción): oscilador triangular agudo, brevísimo y MÁS QUIETO que
+   * el resto (suena cada segundo — no debe cansar).
+   */
+  tick(durationSec = 0.05, fromHz = 1500, toHz = 900): void {
+    const ctx = this.playableContext();
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(fromHz, t0);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(toHz, 1), t0 + durationSec);
+    gain.gain.setValueAtTime(MASTER_GAIN * 0.45, t0);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durationSec);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + durationSec);
+  }
+
+  /**
+   * Timeout (SPEC §8: «tono grave sostenido con decay»): seno grave que
+   * desciende lentamente con ataque corto (que no clickee) y caída
+   * exponencial — el «la niebla lo cubrió todo» sonoro del GAME_OVER.
+   */
+  timeout(durationSec = 1.1, fromHz = 220, toHz = 55): void {
+    const ctx = this.playableContext();
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(fromHz, t0);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(toHz, 1), t0 + durationSec);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.linearRampToValueAtTime(MASTER_GAIN * 0.9, t0 + Math.min(0.04, durationSec / 4));
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durationSec);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + durationSec);
+  }
+
+  /**
    * Contexto válido para sonar: ya desbloqueado Y sin mute. En cualquier
    * otro caso devuelve `null` → la primitiva es no-op SIN crear fuentes.
    */

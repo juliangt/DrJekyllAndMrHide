@@ -37,13 +37,8 @@ import {
 } from '../config/narrative';
 import { BASE_HEIGHT, BASE_WIDTH } from '../config/dimensions';
 import { hexToNumber, nightBackground } from '../config/palette';
-import { TEXTURE_KEYS } from '../art/textures';
-import {
-  driftOffset,
-  lampFlicker,
-  slotDrift,
-  type DriftParams,
-} from '../art/parallax';
+import { ParallaxField } from '../art/ParallaxField';
+import { lampFlicker } from '../art/parallax';
 import { SceneKey } from '../config/sceneKeys';
 import type { LevelConfig, LoreBackground, LorePanel } from '../config/levels/types';
 import { fadeIn, transitionTo, wipeTo } from './sceneNav';
@@ -55,20 +50,6 @@ import { Panel } from '../ui/Panel';
 /** Datos de arranque (`scene.start(NARRATIVE, data)`), p. ej. desde MENU. */
 export interface NarrativeSceneData {
   levelId?: number;
-}
-
-/** Un sprite de capa parallax con su deriva precalculada. */
-interface DriftingSprite {
-  sprite: Phaser.GameObjects.Image;
-  baseX: number;
-  drift: DriftParams;
-}
-
-/** Farola con su propio ritmo de flicker. */
-interface FlickeringLamp {
-  sprite: Phaser.GameObjects.Image;
-  speed: number;
-  phase: number;
 }
 
 /** Prop con brillo pulsante (frascos del laboratorio). */
@@ -84,10 +65,10 @@ export class NarrativeScene extends Phaser.Scene {
   private audioSystem!: AudioSystem;
 
   private backgroundType!: LoreBackground;
-  /** Todo lo pintado por el fondo actual (para trocar de viñeta). */
-  private backgroundObjects: Array<Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle> = [];
-  private readonly drifting: DriftingSprite[] = [];
-  private readonly lamps: FlickeringLamp[] = [];
+  /** Campo parallax del fondo actual (suelo + capas con deriva/flicker). */
+  private field: ParallaxField | null = null;
+  /** Props estáticos del fondo actual (para trocar de viñeta). */
+  private backgroundObjects: Phaser.GameObjects.Image[] = [];
   private readonly glowing: GlowingProp[] = [];
 
   private panel!: Panel;
@@ -103,8 +84,6 @@ export class NarrativeScene extends Phaser.Scene {
     this.level = activeLevelFor(data.levelId);
     this.progress = initialNarrativeState(this.level.lore.length);
     this.exiting = false;
-    this.drifting.length = 0;
-    this.lamps.length = 0;
     this.glowing.length = 0;
     this.backgroundObjects = [];
   }
@@ -124,12 +103,7 @@ export class NarrativeScene extends Phaser.Scene {
 
   update(time: number): void {
     const t = time / 1000;
-    for (const entry of this.drifting) {
-      entry.sprite.x = entry.baseX + driftOffset(t, entry.drift);
-    }
-    for (const lamp of this.lamps) {
-      lamp.sprite.alpha = lampFlicker(t + lamp.phase, 0.78, lamp.speed);
-    }
+    this.field?.update(t);
     for (const prop of this.glowing) {
       prop.sprite.alpha = prop.baseAlpha * lampFlicker(t + prop.phase, 0.72, 1.6);
     }
@@ -168,42 +142,16 @@ export class NarrativeScene extends Phaser.Scene {
       obj.destroy();
     }
     this.backgroundObjects = [];
-    this.drifting.length = 0;
-    this.lamps.length = 0;
     this.glowing.length = 0;
+    this.field?.destroy();
+    this.field = null;
     this.backgroundType = type;
 
-    // Banda de suelo/adoquines (solo exteriores).
-    if (def.ground) {
-      const ground = this.add
-        .rectangle(
-          BASE_WIDTH / 2,
-          (def.ground.y + BASE_HEIGHT) / 2,
-          BASE_WIDTH,
-          BASE_HEIGHT - def.ground.y,
-          hexToNumber(def.ground.color),
-        )
-        .setDepth(0.5);
-      this.backgroundObjects.push(ground);
-    }
-
-    // Capas con deriva: siluetas, niebla y farolas (flicker en runtime).
-    def.layers.forEach((layer, layerIndex) => {
-      for (const slot of layer.slots) {
-        const sprite = this.add
-          .image(slot.x, slot.y, layer.key)
-          .setScale(slot.scale)
-          .setAlpha(layer.alpha)
-          .setDepth(layer.depth);
-        if (layer.tint) {
-          sprite.setTint(hexToNumber(layer.tint));
-        }
-        this.backgroundObjects.push(sprite);
-        this.drifting.push({ sprite, baseX: slot.x, drift: slotDrift(layer, slot) });
-        if (layer.key === TEXTURE_KEYS.lampPost) {
-          this.lamps.push({ sprite, speed: 4.2 + layerIndex * 1.3, phase: slot.phaseOffset });
-        }
-      }
+    // Suelo + capas con deriva (siluetas, niebla, farolas en flicker) — el
+    // campo parallax reutilizable de la Etapa 4 come la tabla del fondo.
+    this.field = new ParallaxField(this, {
+      layers: def.layers,
+      ground: def.ground ? { color: def.ground.color, y: def.ground.y } : undefined,
     });
 
     // Props estáticos encima (mesa y frascos del laboratorio).

@@ -324,6 +324,80 @@ export const LAB_PARALLAX_LAYERS: readonly ParallaxLayer[] = [
   },
 ];
 
+// ---- Fondo del minijuego (Etapa 4, PLAN/SPEC §4.2) ----------------------------
+
+/**
+ * Fondo de ACTION (el callejón del minijuego): fachadas grandes en silueta
+ * sobre la línea de calle, dos farolas con flicker y TRES bandas de niebla
+ * (lejos/media/cercana, SPEC §4.2 «niebla en capas») que derivan por la
+ * ZONA DE JUEGO (la niña se mueve a depth 6, por encima de toda la niebla;
+ * el HUD vive a depth ≥ 10 — ver `gameplay/actionLayout.ts`).
+ *
+ * Presupuesto de niebla (SPEC §10.4 ≤ 30): 6 slots de niebla aquí + el pool
+ * de puffs del feedback (≤ 6, `PUFF_POOL_SIZE`) = 12 ≤ 30 (testeado).
+ */
+export const ACTION_PARALLAX_LAYERS: readonly ParallaxLayer[] = [
+  {
+    // Fachadas del callejón: grandes y apretadas (paredes que se cierran).
+    key: TEXTURE_KEYS.building,
+    alpha: 1,
+    depth: 1,
+    drift: { speed: 0.06, amplitude: 5, phase: 0.2 },
+    slots: [
+      { x: 60, y: 830, scale: 0.95, phaseOffset: 0 },
+      { x: 350, y: 842, scale: 1.05, phaseOffset: SLOT_PHASE_STEP },
+      { x: 650, y: 836, scale: 0.98, phaseOffset: SLOT_PHASE_STEP * 2.2 },
+    ],
+  },
+  {
+    // Niebla lejana: fondo del callejón, casi estática.
+    key: TEXTURE_KEYS.fog,
+    tint: fogFar,
+    alpha: 0.2,
+    depth: 2,
+    drift: { speed: 0.15, amplitude: 30, phase: 1.0 },
+    slots: [
+      { x: 150, y: 420, scale: 3.0, phaseOffset: 0 },
+      { x: 570, y: 480, scale: 3.2, phaseOffset: SLOT_PHASE_STEP * 2 },
+    ],
+  },
+  {
+    // Farolas del callejón (flicker en runtime, a los lados de la zona).
+    key: TEXTURE_KEYS.lampPost,
+    alpha: 1,
+    depth: 3,
+    drift: { speed: 0.07, amplitude: 3, phase: 2.4 },
+    slots: [
+      { x: 130, y: 878, scale: 1.05, phaseOffset: 0 },
+      { x: 600, y: 886, scale: 1.0, phaseOffset: SLOT_PHASE_STEP },
+    ],
+  },
+  {
+    // Niebla media: envuelve los faroles y la mitad baja de la zona.
+    key: TEXTURE_KEYS.fog,
+    tint: fogMid,
+    alpha: 0.18,
+    depth: 4,
+    drift: { speed: 0.24, amplitude: 46, phase: 1.9 },
+    slots: [
+      { x: 60, y: 640, scale: 3.4, phaseOffset: 0 },
+      { x: 520, y: 720, scale: 3.5, phaseOffset: SLOT_PHASE_STEP * 2 },
+    ],
+  },
+  {
+    // Niebla frontal: la más rápida y clara, rueda por delante del callejón.
+    key: TEXTURE_KEYS.fog,
+    tint: fogNear,
+    alpha: 0.12,
+    depth: 5,
+    drift: { speed: 0.34, amplitude: 58, phase: 3.3 },
+    slots: [
+      { x: 240, y: 900, scale: 3.6, phaseOffset: 0 },
+      { x: 760, y: 960, scale: 3.8, phaseOffset: SLOT_PHASE_STEP * 2 },
+    ],
+  },
+];
+
 // ---- Flicker de farolas -------------------------------------------------------
 
 /**

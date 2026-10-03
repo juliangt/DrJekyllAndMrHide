@@ -34,18 +34,12 @@ import { BASE_HEIGHT, BASE_WIDTH } from '../config/dimensions';
 import { hexToNumber, nightBackground, parchmentDark, parchmentLight, street, textPrimary } from '../config/palette';
 import { SceneKey } from '../config/sceneKeys';
 import { TEXTURE_KEYS } from '../art/textures';
-import {
-  MENU_PARALLAX_LAYERS,
-  STREET_LINE_Y,
-  driftOffset,
-  lampFlicker,
-  slotDrift,
-} from '../art/parallax';
+import { MENU_PARALLAX_LAYERS, STREET_LINE_Y } from '../art/parallax';
+import { ParallaxField } from '../art/ParallaxField';
 import { fadeIn, transitionTo } from './sceneNav';
 import { getSystems } from '../systems/getSystems';
 import type { AudioSystem } from '../systems/AudioSystem';
 import type { SaveSystem } from '../systems/SaveSystem';
-import type { DriftParams } from '../art/parallax';
 import { GothicButton } from '../ui/GothicButton';
 
 /** Profundidades de pintado (la niebla cercana queda bajo la UI, SPEC §9). */
@@ -60,23 +54,8 @@ const SUBTITLE_FADE_MS = 900;
 const MUTE_ICON_SIZE = 64;
 const MUTE_HIT_SIZE = 88;
 
-/** Un sprite de capa parallax con su deriva precalculada. */
-interface DriftingSprite {
-  sprite: Phaser.GameObjects.Image;
-  baseX: number;
-  drift: DriftParams;
-}
-
-/** Farola con su propio ritmo de flicker. */
-interface FlickeringLamp {
-  sprite: Phaser.GameObjects.Image;
-  speed: number;
-  phase: number;
-}
-
 export class MenuScene extends Phaser.Scene {
-  private readonly drifting: DriftingSprite[] = [];
-  private readonly lamps: FlickeringLamp[] = [];
+  private field!: ParallaxField;
   private systems!: { saveSystem: SaveSystem; audioSystem: AudioSystem };
   private muteIcon!: Phaser.GameObjects.Image;
   private howToPlayOverlay!: Phaser.GameObjects.Container;
@@ -86,8 +65,6 @@ export class MenuScene extends Phaser.Scene {
   }
 
   create(): void {
-    this.drifting.length = 0;
-    this.lamps.length = 0;
     const { saveSystem, audioSystem } = getSystems(this);
     this.systems = { saveSystem, audioSystem };
 
@@ -108,39 +85,17 @@ export class MenuScene extends Phaser.Scene {
   }
 
   update(time: number): void {
-    const t = time / 1000;
-    for (const entry of this.drifting) {
-      entry.sprite.x = entry.baseX + driftOffset(t, entry.drift);
-    }
-    for (const lamp of this.lamps) {
-      lamp.sprite.alpha = lampFlicker(t + lamp.phase, 0.78, lamp.speed);
-    }
+    this.field.update(time / 1000);
   }
 
   // ---- Fondo: callejón + niebla parallax ----------------------------------
 
   private buildAlley(): void {
-    // Banda de calle/adoquines bajo la línea de calle (paleta §7.1).
-    this.add
-      .rectangle(BASE_WIDTH / 2, (STREET_LINE_Y + BASE_HEIGHT) / 2, BASE_WIDTH, BASE_HEIGHT - STREET_LINE_Y + 40, hexToNumber(street))
-      .setDepth(0.5);
-
-    MENU_PARALLAX_LAYERS.forEach((layer, layerIndex) => {
-      for (const slot of layer.slots) {
-        const sprite = this.add
-          .image(slot.x, slot.y, layer.key)
-          .setScale(slot.scale)
-          .setAlpha(layer.alpha)
-          .setDepth(layer.depth);
-        if (layer.tint) {
-          sprite.setTint(hexToNumber(layer.tint));
-        }
-        this.drifting.push({ sprite, baseX: slot.x, drift: slotDrift(layer, slot) });
-        if (layer.key === TEXTURE_KEYS.lampPost) {
-          // Cada farola parpadea con su propio ritmo (SPEC §7.2 flicker).
-          this.lamps.push({ sprite, speed: 4.2 + layerIndex * 1.3, phase: slot.phaseOffset });
-        }
-      }
+    // Campo parallax reutilizable (Etapa 4): suelo de adoquines + capas de
+    // la tabla MENU_PARALLAX_LAYERS con deriva y flicker de farolas.
+    this.field = new ParallaxField(this, {
+      layers: MENU_PARALLAX_LAYERS,
+      ground: { color: street, y: STREET_LINE_Y, bleedY: 40 },
     });
   }
 

@@ -56,8 +56,8 @@ function makeRecordingGraphics(): { g: Parameters<TextureDef['draw']>[0]; calls:
 const PALETTE_NUMBERS = new Set<number>(Object.values(PALETTE).map((hex) => hexToNumber(hex)));
 
 describe('TEXTURE_DEFS — invariants del registro', () => {
-  it('tiene las 12 texturas (hornadas 1 + 2 + 3)', () => {
-    expect(TEXTURE_DEFS.length).toBe(12);
+  it('tiene las 13 texturas (hornadas 1 + 2 + 3 + 4)', () => {
+    expect(TEXTURE_DEFS.length).toBe(13);
   });
 
   it('claves únicas', () => {
@@ -118,9 +118,15 @@ describe('TEXTURE_DEFS — invariants del registro', () => {
 
   it('la 3ª hornada (Etapa 3): mesa y frasco del laboratorio narrativo', () => {
     const keys = TEXTURE_DEFS.map((def) => def.key);
-    expect(keys.slice(10)).toEqual([TEXTURE_KEYS.labBench, TEXTURE_KEYS.labFlask]);
+    expect(keys.slice(10, 12)).toEqual([TEXTURE_KEYS.labBench, TEXTURE_KEYS.labFlask]);
     expect(TEXTURE_KEYS.labBench).toBe('lab-bench');
     expect(TEXTURE_KEYS.labFlask).toBe('lab-flask');
+  });
+
+  it('la 4ª hornada (Etapa 4): la niña del minijuego', () => {
+    const keys = TEXTURE_DEFS.map((def) => def.key);
+    expect(keys.slice(12)).toEqual([TEXTURE_KEYS.girl]);
+    expect(TEXTURE_KEYS.girl).toBe('girl');
   });
 });
 
@@ -294,6 +300,29 @@ describe('TEXTURE_DEFS — dibujos con Graphics de grabación', () => {
     expect(
       calls.some(
         (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.parchmentLight),
+      ),
+    ).toBe(true);
+  });
+
+  it('la niña (Etapa 4): silueta + farol con doble halo de fuego', () => {
+    const def = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.girl);
+    expect(def).toBeDefined();
+    const { g, calls } = makeRecordingGraphics();
+    def?.draw(g);
+    // Silueta: cabeza + moños (círculos), torso/falda/brazo (triángulos),
+    // piernas/botas y jaula del farol (rects).
+    expect(calls.filter((c) => c.method === 'fillCircle').length).toBeGreaterThanOrEqual(6);
+    expect(calls.filter((c) => c.method === 'fillTriangle').length).toBeGreaterThanOrEqual(4);
+    expect(calls.filter((c) => c.method === 'fillRect').length).toBeGreaterThanOrEqual(9);
+    // El farol es el punto focal: 2 halos + núcleo en fuego de farola.
+    expect(
+      calls.filter((c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.lampFire))
+        .length,
+    ).toBeGreaterThanOrEqual(3);
+    // La silueta usa el color de edificios (misma familia que las farolas).
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.buildings),
       ),
     ).toBe(true);
   });
