@@ -73,6 +73,8 @@ export const TEXTURE_KEYS = {
   labBench: 'lab-bench',
   /** Matraz Erlenmeyer neutro: se tiñe (verde/púrpura) vía tint del prop. */
   labFlask: 'lab-flask',
+  /** La niña: silueta pequeña con farol iluminado (objetivo N1, SPEC §7.2). */
+  girl: 'girl',
 } as const;
 
 /**
@@ -296,6 +298,7 @@ function drawSpeakerOff(g: Phaser.GameObjects.Graphics): void {
 
 // ---- Texturas de la Etapa 3 (fondo «lab» de la narrativa, SPEC §4.1/§7.2) ----
 
+
 /**
  * Mesa de laboratorio (720 px de ancho: ocupa todo el fondo del panel 2).
  * Tablero oscuro con canto, faldón, patas y travesaño; un reflejo tenue de
@@ -364,11 +367,58 @@ function drawLabFlask(g: Phaser.GameObjects.Graphics): void {
   g.fillRect(36, 2, 24, 10);
 }
 
+// ---- Texturas de la Etapa 4 (minijuego de acción, SPEC §4.2/§7.2) -----------
+
+/**
+ * La niña (objetivo del Nivel 1): silueta pequeña reconocible — cabeza con
+ * moños, vestido acampanado, piernas — cuyo punto focal es el FAROL
+ * iluminado (doble halo de fuego de farola, el mismo lenguaje de las
+ * farolas del callejón). Determinista; la animación de caminar (bob/tilt)
+ * es runtime, no parte de la textura.
+ */
+function drawGirl(g: Phaser.GameObjects.Graphics): void {
+  const silhouette = hexToNumber(buildings);
+  const fire = hexToNumber(lampFire);
+
+  // Halos del farol (la luz que la hace visible en la niebla) — primero,
+  // para que la jaula y la niña piquen encima.
+  g.fillStyle(fire, 0.14);
+  g.fillCircle(72, 92, 22);
+  g.fillStyle(fire, 0.22);
+  g.fillCircle(72, 92, 13);
+
+  // Silueta: cabeza + moños.
+  g.fillStyle(silhouette, 1);
+  g.fillCircle(44, 28, 11);
+  g.fillCircle(30, 21, 4);
+  g.fillCircle(58, 21, 4);
+  // Torso y vestido acampanado (trapecio en dos triángulos).
+  g.fillTriangle(37, 41, 51, 41, 44, 82);
+  g.fillTriangle(35, 74, 53, 74, 23, 122);
+  g.fillTriangle(53, 74, 65, 122, 23, 122);
+  // Piernas y botas.
+  g.fillRect(37, 122, 6, 30);
+  g.fillRect(47, 122, 6, 30);
+  g.fillRect(34, 150, 10, 8);
+  g.fillRect(46, 150, 10, 8);
+  // Brazo extendido hacia el farol.
+  g.fillTriangle(50, 48, 69, 67, 54, 74);
+
+  // Farol colgando de la mano: asa, jaula y núcleo de fuego.
+  g.fillRect(70, 66, 4, 14); // asa
+  g.fillRect(62, 80, 20, 4); // techo del farol
+  g.fillRect(62, 100, 20, 4); // base del farol
+  g.fillRect(62, 84, 4, 16); // barrote izq
+  g.fillRect(78, 84, 4, 16); // barrote der
+  g.fillStyle(fire, 0.95);
+  g.fillCircle(72, 92, 6); // núcleo
+}
+
 /**
  * Registro de texturas: primera hornada (PLAN Etapa 1) + iconos de la
- * Etapa 2 («Cómo jugar» y toggle de mute) + fondo «lab» de la Etapa 3.
- * Hornadas futuras (niña, Hyde, sello de cera…) se añaden aquí o en
- * registros posteriores.
+ * Etapa 2 («Cómo jugar» y toggle de mute) + fondo «lab» de la Etapa 3 +
+ * la niña de la Etapa 4. Hornadas futuras (Hyde, sello de cera…) se
+ * añaden aquí o en registros posteriores.
  */
 export const TEXTURE_DEFS: readonly TextureDef[] = [
   {
@@ -455,6 +505,13 @@ export const TEXTURE_DEFS: readonly TextureDef[] = [
     description:
       'Matraz Erlenmeyer neutro, teñible vía tint (verde/púrpura) para el laboratorio.',
     draw: drawLabFlask,
+  },
+  {
+    key: TEXTURE_KEYS.girl,
+    width: 96,
+    height: 176,
+    description: 'La niña: silueta pequeña con farol iluminado (objetivo del minijuego N1).',
+    draw: drawGirl,
   },
 ];
 

@@ -6,6 +6,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  ACTION_PARALLAX_LAYERS,
   MENU_PARALLAX_LAYERS,
   STREET_LINE_Y,
   driftOffset,
@@ -144,6 +145,85 @@ describe('lampFlicker — parpadeo determinista de farolas (SPEC §7.2)', () => 
       values.add(lampFlicker(t));
     }
     expect(values.size).toBeGreaterThan(5);
+  });
+});
+
+// ---- Etapa 4: fondo del minijuego (ACTION_PARALLAX_LAYERS) --------------------
+
+describe('ACTION_PARALLAX_LAYERS — el callejón del minijuego (Etapa 4)', () => {
+  it('capas ordenadas por profundidad, sin empates', () => {
+    const depths = ACTION_PARALLAX_LAYERS.map((layer) => layer.depth);
+    expect(new Set(depths).size).toBe(depths.length);
+    expect([...depths].sort((a, b) => a - b)).toEqual(depths);
+  });
+
+  it('cada capa usa una textura registrada', () => {
+    const registered = new Set<string>(Object.values(TEXTURE_KEYS));
+    for (const layer of ACTION_PARALLAX_LAYERS) {
+      expect(registered.has(layer.key), `${layer.key} no está en TEXTURE_KEYS`).toBe(true);
+    }
+  });
+
+  it('composición del SPEC §4.2: edificios + nieblas + farolas', () => {
+    const keys = ACTION_PARALLAX_LAYERS.map((layer) => layer.key);
+    expect(keys).toContain(TEXTURE_KEYS.building);
+    expect(keys).toContain(TEXTURE_KEYS.lampPost);
+    expect(keys.filter((key) => key === TEXTURE_KEYS.fog).length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('derivas finitas y amplitudes no negativas', () => {
+    for (const layer of ACTION_PARALLAX_LAYERS) {
+      expect(Number.isFinite(layer.drift.speed)).toBe(true);
+      expect(layer.drift.speed).toBeGreaterThan(0);
+      expect(layer.drift.amplitude).toBeGreaterThanOrEqual(0);
+      expect(Number.isFinite(layer.drift.phase)).toBe(true);
+      for (const slot of layer.slots) {
+        expect(slot.scale).toBeGreaterThan(0);
+        expect(Number.isFinite(slot.x)).toBe(true);
+        expect(Number.isFinite(slot.y)).toBe(true);
+      }
+    }
+  });
+
+  it('slots dentro del lienzo (con holgura de deriva)', () => {
+    for (const layer of ACTION_PARALLAX_LAYERS) {
+      for (const slot of layer.slots) {
+        expect(slot.y).toBeGreaterThanOrEqual(0);
+        expect(slot.y).toBeLessThanOrEqual(BASE_HEIGHT);
+        expect(slot.x - layer.drift.amplitude).toBeLessThan(BASE_WIDTH);
+        expect(slot.x + layer.drift.amplitude).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('tintes de niebla desde la paleta, alfas tenues', () => {
+    const paletteValues = new Set(Object.values(PALETTE));
+    for (const layer of ACTION_PARALLAX_LAYERS) {
+      if (layer.tint) {
+        expect(paletteValues.has(layer.tint), `${layer.key}.tint=${layer.tint}`).toBe(true);
+      }
+      expect(layer.alpha).toBeGreaterThan(0);
+      expect(layer.alpha).toBeLessThanOrEqual(1);
+    }
+    for (const fog of ACTION_PARALLAX_LAYERS.filter((l) => l.key === TEXTURE_KEYS.fog)) {
+      expect(fog.alpha).toBeLessThanOrEqual(0.3);
+    }
+  });
+
+  it('presupuesto de niebla del fondo ≤ 30 slots (SPEC §10.4)', () => {
+    const fogSlots = ACTION_PARALLAX_LAYERS
+      .filter((layer) => layer.key === TEXTURE_KEYS.fog)
+      .reduce((sum, layer) => sum + layer.slots.length, 0);
+    expect(fogSlots).toBeLessThanOrEqual(30);
+  });
+
+  it('slotDrift sirve también a las capas de ACTION (fase compuesta)', () => {
+    for (const layer of ACTION_PARALLAX_LAYERS) {
+      for (const slot of layer.slots) {
+        const drift = slotDrift(layer, slot);
+        expect(drift.phase).toBeCloseTo(layer.drift.phase + slot.phaseOffset, 6);
+      }
+    }
   });
 });
 
