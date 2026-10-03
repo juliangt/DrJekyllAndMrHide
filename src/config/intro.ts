@@ -241,6 +241,12 @@ export const INTRO_ALLEY_WALK = {
   /** Vaivén del paso: bob vertical y balanceo mínimo de rotación. */
   bob: { px: 7, cycleMs: 560 },
   rockRad: 0.035,
+  /**
+   * Vaivén del BRAZO articulado (`hyde-arm`) acompañando el paso: oscila
+   * alrededor del hombro con el mismo ciclo del bob — el caminar se lee en
+   * todo el cuerpo, no solo en la deriva del sprite.
+   */
+  arm: { swayRad: 0.3, cycleMs: 560 },
 } as const;
 
 /**
@@ -261,7 +267,8 @@ export const INTRO_GIRL_APPEARS = {
 
 /**
  * Beat «Menace»: Hyde la ve (destello verde del ojo), avanza acechando y
- * ALZA EL BRAZO (rotación negativa = el lado del brazo sube). Amenaza
+ * ALZA EL BRAZO (el brazo ARTICULADO gira desde el hombro con Back.easeOut:
+ * el látigo del gesto se lee con un overshoot y queda en alto). Amenaza
  * SUGERIDA, público 10+: el acercamiento NUNCA la alcanza, el golpe nunca
  * cae y la niña solo se encoge (queda «asustada pero ilesa», lore del quiz).
  */
@@ -275,8 +282,14 @@ export const INTRO_MENACE = {
   eyeFlare: { color: labGreen, scale: 0.3, durationMs: 320 },
   /** Acecho: avanza hacia ella acelerando (Quad.easeIn) sin alcanzarla. */
   lunge: { toX: 415, durationMs: 820 },
-  /** Alza el brazo: rotación parcial (queda a medias, jamás completa el golpe). */
-  armRaise: { rad: -0.55, durationMs: 560 },
+  /** Inclinación del torso hacia adelante durante el acecho (encorvamiento). */
+  hunchRad: 0.1,
+  /**
+   * Alza el brazo ARTICULADO: rotación desde el hombro (~80°, casi horizontal
+   * apuntando a la niña — el brazo queda BIEN en alto, mucho más legible que
+   * una inclinación de cuerpo entero) y aún PARCIAL: el golpe jamás cae.
+   */
+  armRaise: { rad: -1.4, durationMs: 620 },
   /** La niña se encoge: retroceso corto tras empezar el acecho. */
   flinch: { toX: 600, delayMs: 420, durationMs: 300 },
   /** Temblor de la niña: compresión vertical sutil (se hace pequeña). */
@@ -289,11 +302,14 @@ export const INTRO_MENACE = {
  * Beat «PlayerIsHyde»: cierre atmosférico — la niebla crece (velo + puffs),
  * el letrero final dirige al JUGADOR y, al completarse este beat, el flujo
  * existente cierra con el wipe hacia NARRATIVE (no se duplica aquí). El
- * brazo de Hyde queda EN ALTO, relajado un pelín: el golpe nunca cae.
+ * brazo de Hyde queda EN ALTO (un pelín más relajado que el alzo), con una
+ * respiración sutil: la amenaza congelada sigue viva. El golpe nunca cae.
  */
 export const INTRO_PLAYER_IS_HYDE = {
   /** Pose congelada del brazo (algo menor que el alzo del acecho). */
-  armHoldRad: -0.5,
+  armHoldRad: -1.25,
+  /** Respiración del brazo en alto (vaivén de rotación alrededor de la pose). */
+  armBreatheRad: 0.05,
   /** Velo de niebla que espesa la escena (sobre los personajes, bajo el letrero). */
   veil: { color: fogNear, alpha: 0.32, durationMs: 1600 },
   /** Puffs de niebla creciendo por toda la escena (la que «lo cubre todo»). */
@@ -346,6 +362,21 @@ export const INTRO_SCENE_LAYOUT = {
   },
   /** Botón «Saltar» (misma esquina y estilo que `NARRATIVE_SKIP_BUTTON`). */
   skipButton: { x: BASE_WIDTH - 40 - 110, y: 96, depth: 12 },
+  /**
+   * Flechas de navegación al COSTADO (adelante/atrás ENTRE BEATS): mismo
+   * estilo y comportamiento que las de la narrativa — la navegación es la
+   * misma en toda la historia. Van MÁS ARRIBA que en la narrativa (y = 420):
+   * aquí los personajes actúan a y ≈ 660 y la niña se encoge hacia la
+   * esquina derecha — a media pantalla la flecha pisaría la escena.
+   */
+  nav: {
+    marginX: 52,
+    y: 420,
+    scale: 0.9,
+    disabledAlpha: 0.28,
+    pressedScale: 0.85,
+    depth: 12,
+  },
   /** Profundidad del flash de la transformación (sobre toda la escena). */
   flashDepth: 30,
   /** Duración del velo de trocado de fondo (ms; solo fase 2 lo usa). */
@@ -365,6 +396,7 @@ export const INTRO_TARGET_LEVEL_ID = 1;
 export const INTRO_TEXTURES = {
   jekyll: TEXTURE_KEYS.jekyll,
   hyde: TEXTURE_KEYS.hyde,
+  arm: TEXTURE_KEYS.hydeArm,
   girl: TEXTURE_KEYS.girl,
   puff: TEXTURE_KEYS.fogPuff,
   halo: TEXTURE_KEYS.fog,

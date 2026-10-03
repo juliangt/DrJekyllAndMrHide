@@ -56,8 +56,8 @@ function makeRecordingGraphics(): { g: Parameters<TextureDef['draw']>[0]; calls:
 const PALETTE_NUMBERS = new Set<number>(Object.values(PALETTE).map((hex) => hexToNumber(hex)));
 
 describe('TEXTURE_DEFS — invariants del registro', () => {
-  it('tiene las 16 texturas (hornadas 1 + 2 + 3 + 4 + 5 + intro)', () => {
-    expect(TEXTURE_DEFS.length).toBe(16);
+  it('tiene las 19 texturas (hornadas 1 + 2 + 3 + 4 + 5 + intro + navegación + cielo)', () => {
+    expect(TEXTURE_DEFS.length).toBe(19);
   });
 
   it('claves únicas', () => {
@@ -135,14 +135,23 @@ describe('TEXTURE_DEFS — invariants del registro', () => {
     expect(TEXTURE_KEYS.waxSeal).toBe('wax-seal');
   });
 
-  it('la 6ª hornada (intro pre-nivel): Jekyll al final, Hyde último', () => {
+  it('la 6ª hornada (intro pre-nivel): Jekyll, Hyde y el brazo articulado', () => {
     const keys = TEXTURE_DEFS.map((def) => def.key);
     // Las texturas nuevas se añadieron AL FINAL del registro (los slices por
     // índice de las hornadas 1–5 siguen intactos).
     expect(keys.slice(14, 15)).toEqual([TEXTURE_KEYS.jekyll]);
-    expect(keys.slice(15)).toEqual([TEXTURE_KEYS.hyde]);
+    expect(keys.slice(15, 16)).toEqual([TEXTURE_KEYS.hyde]);
+    expect(keys.slice(16, 17)).toEqual([TEXTURE_KEYS.hydeArm]);
     expect(TEXTURE_KEYS.jekyll).toBe('jekyll');
     expect(TEXTURE_KEYS.hyde).toBe('hyde');
+    expect(TEXTURE_KEYS.hydeArm).toBe('hyde-arm');
+  });
+
+  it('la 7ª hornada (navegación y cielo): la flecha del costado y la estrella', () => {
+    const keys = TEXTURE_DEFS.map((def) => def.key);
+    expect(keys.slice(17)).toEqual([TEXTURE_KEYS.arrow, TEXTURE_KEYS.star]);
+    expect(TEXTURE_KEYS.arrow).toBe('arrow');
+    expect(TEXTURE_KEYS.star).toBe('star');
   });
 });
 
@@ -335,12 +344,18 @@ describe('TEXTURE_DEFS — dibujos con Graphics de grabación', () => {
       calls.filter((c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.lampFire))
         .length,
     ).toBeGreaterThanOrEqual(3);
-    // La silueta usa el color de edificios (misma familia que las farolas).
+    // La silueta usa fogFar: un tono MÁS CLARO que los edificios para que la
+    // niña se recorte de la noche (contraste, feedback visual del jugador).
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.fogFar),
+      ),
+    ).toBe(true);
     expect(
       calls.some(
         (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.buildings),
       ),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('el sello de cera (Etapa 6): disco púrpura irregular + relieve + brillo', () => {

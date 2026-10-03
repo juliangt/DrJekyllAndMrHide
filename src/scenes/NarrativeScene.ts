@@ -30,15 +30,18 @@ import {
   activeLevelFor,
   initialNarrativeState,
   narrativeProgress,
+  narrativeStartIndex,
   panelTextLayout,
   progressLabel as progressLabelText,
   type LoreBackgroundDef,
+  type LoreStarSlot,
   type NarrativeProgressState,
 } from '../config/narrative';
 import { BASE_HEIGHT, BASE_WIDTH } from '../config/dimensions';
 import { hexToNumber, nightBackground } from '../config/palette';
 import { ParallaxField } from '../art/ParallaxField';
 import { lampFlicker } from '../art/parallax';
+import { TEXTURE_KEYS } from '../art/textures';
 import { SceneKey } from '../config/sceneKeys';
 import type { LevelConfig, LoreBackground, LorePanel } from '../config/levels/types';
 import { fadeIn, transitionTo, wipeTo } from './sceneNav';
@@ -50,6 +53,11 @@ import { Panel } from '../ui/Panel';
 /** Datos de arranque (`scene.start(NARRATIVE, data)`), p. ej. desde MENU. */
 export interface NarrativeSceneData {
   levelId?: number;
+  /**
+   * True al llegar desde la cinemática de la intro: arranca en el primer
+   * panel que la intro NO contó (los 1–3 ya se vieron animados).
+   */
+  fromIntro?: boolean;
 }
 
 /** Prop con brillo pulsante (frascos del laboratorio). */
@@ -73,6 +81,9 @@ export class NarrativeScene extends Phaser.Scene {
 
   private panel!: Panel;
   private progressText!: Phaser.GameObjects.Text;
+  /** Flechas del costado (adelante/atrás): la señal visible del paso de páginas. */
+  private prevArrow!: Phaser.GameObjects.Image;
+  private nextArrow!: Phaser.GameObjects.Image;
   /** True cuando ya se disparó la salida hacia ACTION (anti doble tap). */
   private exiting = false;
 
@@ -82,7 +93,8 @@ export class NarrativeScene extends Phaser.Scene {
 
   init(data: NarrativeSceneData = {}): void {
     this.level = activeLevelFor(data.levelId);
-    this.progress = initialNarrativeState(this.level.lore.length);
+    const total = this.level.lore.length;
+    this.progress = initialNarrativeState(total, narrativeStartIndex(data.fromIntro ?? false, total));
     this.exiting = false;
     this.glowing.length = 0;
     this.backgroundObjects = [];
@@ -98,6 +110,7 @@ export class NarrativeScene extends Phaser.Scene {
     this.buildBackground(this.currentPanel().background, { animated: false });
     this.buildPanel();
     this.buildHud();
+    this.buildNavArrows();
     this.buildTapLayer();
   }
 
@@ -169,6 +182,18 @@ export class NarrativeScene extends Phaser.Scene {
         this.glowing.push({ sprite, baseAlpha: prop.alpha, phase: propIndex * 0.9 });
       }
     });
+
+    // Estrellas del cielo (solo exteriores): detrás de las siluetas de los
+    // edificios (depth de capas ≥ 1) y titilando con fases propias.
+    (def.stars ?? []).forEach((star: LoreStarSlot, starIndex) => {
+      const sprite = this.add
+        .image(star.x, star.y, TEXTURE_KEYS.star)
+        .setScale(star.scale)
+        .setAlpha(star.alpha)
+        .setDepth(0.75);
+      this.backgroundObjects.push(sprite);
+      this.glowing.push({ sprite, baseAlpha: star.alpha, phase: starIndex * 1.7 });
+    });
   }
 
   // ---- Panel de texto (pergamino oscuro) --------------------------------------
@@ -213,6 +238,83 @@ export class NarrativeScene extends Phaser.Scene {
     }).setDepth(depths.ui);
   }
 
+  // ---- Flechas del costado (adelante/atrás, señal visible del paso) -----------
+
+  /**
+   * Flecha a CADA costado de la pantalla (banda del fondo, sobre el panel):
+   * «atrás» a la izquierda (flipX) y «adelante» a la derecha. El tap en
+   * cualquier parte sigue funcionando; las flechas son la señal VISIBLE de
+   * que la historia se pasa página a página. HitArea cuadrado generoso
+   * (táctil ≥ 64 px, SPEC §9).
+   */
+  private buildNavArrows(): void {
+    const { nav, depths } = NARRATIVE_SCENE_LAYOUT;
+    const hit = 100;
+    const half = hit / 2;
+
+    this.prevArrow = this.add
+      .image(nav.marginX, nav.y, TEXTURE_KEYS.arrow)
+      .setScale(nav.scale)
+      .setFlipX(true)
+      .setDepth(depths.ui)
+      .setInteractive({
+        hitArea: new Phaser.Geom.Rectangle(-half, -half, hit, hit),
+        hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+      })
+      .on(Phaser.Input.Events.POINTER_DOWN, () => this.onNavBack());
+
+    this.nextArrow = this.add
+      .image(BASE_WIDTH - nav.marginX, nav.y, TEXTURE_KEYS.arrow)
+      .setScale(nav.scale)
+      .setDepth(depths.ui)
+      .setInteractive({
+        hitArea: new Phaser.Geom.Rectangle(-half, -half, hit, hit),
+        hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+      })
+      .on(Phaser.Input.Events.POINTER_DOWN, () => this.onNavForward());
+
+    this.updateNavArrows();
+  }
+
+  /** Estado de las flechas: «atrás» se atenúa en el primer panel. */
+  private updateNavArrows(): void {
+    const { nav } = NARRATIVE_SCENE_LAYOUT;
+    const canGoBack = this.progress.index > 0 && !this.exiting;
+    this.prevArrow.setAlpha(canGoBack ? 1 : nav.disabledAlpha);
+    this.nextArrow.setAlpha(this.exiting ? nav.disabledAlpha : 1);
+  }
+
+  /** Feedback táctil del press (se restituye solo, sin pelear con otros tweens). */
+  private pressFeedback(arrow: Phaser.GameObjects.Image): void {
+    const { nav } = NARRATIVE_SCENE_LAYOUT;
+    this.tweens.killTweensOf(arrow);
+    this.tweens.add({
+      targets: arrow,
+      scale: { from: nav.scale * nav.pressedScale, to: nav.scale },
+      duration: 180,
+      ease: 'Back.easeOut',
+    });
+  }
+
+  /** Flecha «atrás»: retrocede un panel (el reductor acota en el primero). */
+  private onNavBack(): void {
+    if (this.exiting || this.progress.index <= 0) {
+      return;
+    }
+    this.pressFeedback(this.prevArrow);
+    this.progress = narrativeProgress(this.progress, NarrativeAction.Back);
+    this.renderPanel(true);
+  }
+
+  /** Flecha «adelante»: la MISMA semántica que el tap (en el último, cierra). */
+  private onNavForward(): void {
+    if (this.exiting) {
+      return;
+    }
+    this.pressFeedback(this.nextArrow);
+    this.onTap();
+  }
+
   // ---- Capa de tap (avance por pointerdown) -----------------------------------
 
   private buildTapLayer(): void {
@@ -252,6 +354,7 @@ export class NarrativeScene extends Phaser.Scene {
       return;
     }
     this.exiting = true;
+    this.updateNavArrows();
     this.audioSystem.blip();
     // «Saltar» pide prisa: fade directo (sin wipe teatral).
     transitionTo(this, SceneKey.ACTION, { levelId: this.level.id });
@@ -259,6 +362,7 @@ export class NarrativeScene extends Phaser.Scene {
 
   private exitToAction(): void {
     this.exiting = true;
+    this.updateNavArrows();
     // Sweep de viento de la transición (SPEC §8), si el gesto desbloqueó el audio.
     if (this.audioSystem.isUnlocked) {
       this.audioSystem.wind(1.6);
@@ -274,6 +378,7 @@ export class NarrativeScene extends Phaser.Scene {
     }
 
     this.progressText.setText(progressLabelText(this.progress));
+    this.updateNavArrows();
 
     const layout = panelTextLayout(panelData.text);
     if (!animated) {
