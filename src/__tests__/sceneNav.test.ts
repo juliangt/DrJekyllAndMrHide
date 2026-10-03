@@ -7,6 +7,10 @@
  *
  * Etapa 2 — además, el helper `transitionTo` se ejercita con un FAKE
  * estructural de Scene/Camera (sceneNav importa Phaser solo como TIPO).
+ *
+ * Etapa 3 — ídem con `wipeTo` (fade + cortina de niebla, SPEC §7.2): datos
+ * del wipe (`FOG_WIPE_DEFAULTS`), cortina+tweens con fakes, y el guard de
+ * reentrada COMPARTIDO con transitionTo.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -14,12 +18,15 @@ import { describe, expect, it } from 'vitest';
 import {
   ALT_TRANSITIONS,
   FADE_DURATION_MS,
+  FOG_WIPE_DEFAULTS,
   NEXT_SCENE,
   nextSceneKey,
   transitionTo,
+  wipeTo,
 } from '../scenes/sceneNav';
 import type Phaser from 'phaser';
 import { SceneKey } from '../config/sceneKeys';
+import { TEXTURE_KEYS } from '../art/textures';
 
 describe('SceneKey — las 8 claves del flujo (SPEC §3)', () => {
   it('tiene exactamente BOOT, PRELOAD, MENU, NARRATIVE, ACTION, GAME_OVER, QUIZ, VICTORY', () => {
@@ -242,6 +249,151 @@ describe('transitionTo — guard de reentrada (deuda de la etapa anterior)', () 
     b.cam.completeFade();
     expect(a.started.length).toBe(1);
     expect(b.started.length).toBe(1);
+  });
+});
+
+// ---- wipeTo con fakes estructurales (Etapa 3: NARRATIVE → ACTION) ------------
+
+/** Imagen fake: graba el encadenado de config y los destroy. */
+class FakeImage {
+  readonly props: Record<string, unknown> = {};
+  destroyed = false;
+
+  setScale(scale: number): this {
+    this.props.scale = scale;
+    return this;
+  }
+
+  setAlpha(alpha: number): this {
+    this.props.alpha = alpha;
+    return this;
+  }
+
+  setDepth(depth: number): this {
+    this.props.depth = depth;
+    return this;
+  }
+
+  setTint(tint: number): this {
+    this.props.tint = tint;
+    return this;
+  }
+
+  destroy(): void {
+    this.destroyed = true;
+  }
+}
+
+/** Escena fake de wipe: camera/start como FakeScene + add.image/tweens.add. */
+class FakeWipeScene extends FakeScene {
+  readonly images: FakeImage[] = [];
+  readonly tweensAdded: Array<Record<string, unknown>> = [];
+  readonly add = {
+    image: (_x: number, _y: number, key: string): FakeImage => {
+      const image = new FakeImage();
+      // Registra también la posición/textura para las aserciones.
+      image.props.x = _x;
+      image.props.y = _y;
+      image.props.texture = key;
+      this.images.push(image);
+      return image;
+    },
+  };
+  readonly tweens = {
+    add: (config: Record<string, unknown>): void => {
+      this.tweensAdded.push(config);
+    },
+  };
+}
+
+describe('FOG_WIPE_DEFAULTS — datos del wipe de niebla (SPEC §7.2)', () => {
+  it('duración positiva, dirección válida y textura registrada', () => {
+    expect(FOG_WIPE_DEFAULTS.durationMs).toBeGreaterThan(0);
+    expect([1, -1]).toContain(FOG_WIPE_DEFAULTS.direction);
+    expect(Object.values(TEXTURE_KEYS)).toContain(FOG_WIPE_DEFAULTS.textureKey);
+    expect(FOG_WIPE_DEFAULTS.textureKey).toBe(TEXTURE_KEYS.fog);
+  });
+
+  it('pool acotado (SPEC §10.4 ≤ 30 sprites) con escala y alfa válidas', () => {
+    expect(FOG_WIPE_DEFAULTS.spriteCount).toBeGreaterThanOrEqual(2);
+    expect(FOG_WIPE_DEFAULTS.spriteCount).toBeLessThanOrEqual(30);
+    // 256 px de la niebla × escala debe cubrir el ancho del lienzo (720).
+    expect(256 * FOG_WIPE_DEFAULTS.spriteScale).toBeGreaterThanOrEqual(720);
+    expect(FOG_WIPE_DEFAULTS.alpha).toBeGreaterThan(0);
+    expect(FOG_WIPE_DEFAULTS.alpha).toBeLessThanOrEqual(1);
+    // La cortina se pinta por ENCIMA de toda la UI.
+    expect(FOG_WIPE_DEFAULTS.depth).toBeGreaterThanOrEqual(100);
+    expect(FOG_WIPE_DEFAULTS.staggerMs).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('wipeTo — fade + cortina de niebla (con fakes)', () => {
+  it('crea la cortina (N sprites de niebla, tintes de paleta) y tweens que barren', () => {
+    const fake = new FakeWipeScene();
+    wipeTo(fake as unknown as Phaser.Scene, SceneKey.ACTION, { levelId: 1 });
+
+    expect(fake.images.length).toBe(FOG_WIPE_DEFAULTS.spriteCount);
+    for (const image of fake.images) {
+      expect(image.props.texture).toBe(FOG_WIPE_DEFAULTS.textureKey);
+      expect(image.props.depth).toBe(FOG_WIPE_DEFAULTS.depth);
+      expect(image.props.alpha).toBe(FOG_WIPE_DEFAULTS.alpha);
+      // Arrancan FUERA del lienzo (a la izquierda con direction=1).
+      expect(image.props.x as number).toBeLessThan(0);
+    }
+
+    expect(fake.tweensAdded.length).toBe(FOG_WIPE_DEFAULTS.spriteCount);
+    fake.tweensAdded.forEach((tween, index) => {
+      expect(tween.duration).toBe(FOG_WIPE_DEFAULTS.durationMs);
+      expect(tween.delay).toBe(index * FOG_WIPE_DEFAULTS.staggerMs);
+      // El barrido lleva cada sprite al otro lado del lienzo.
+      expect(tween.x as number).toBeGreaterThan(720);
+    });
+  });
+
+  it('fadeOut de cámara con la MISMA duración y el color de noche', () => {
+    const fake = new FakeWipeScene();
+    wipeTo(fake as unknown as Phaser.Scene, SceneKey.ACTION);
+    expect(fake.cam.fadeOutCalls.length).toBe(1);
+    const [duration, r, g, b] = fake.cam.fadeOutCalls[0];
+    expect(duration).toBe(FOG_WIPE_DEFAULTS.durationMs);
+    expect([r, g, b]).toEqual([0x0d, 0x0f, 0x14]);
+  });
+
+  it('al completarse el fade arranca la escena UNA vez con su data y retira la cortina', () => {
+    const fake = new FakeWipeScene();
+    wipeTo(fake as unknown as Phaser.Scene, SceneKey.ACTION, { levelId: 1 });
+    expect(fake.started.length).toBe(0);
+    fake.cam.completeFade();
+    expect(fake.started).toEqual([[SceneKey.ACTION, { levelId: 1 }]]);
+    for (const image of fake.images) {
+      expect(image.destroyed).toBe(true);
+    }
+  });
+
+  it('guard de reentrada: doble wipe deja UN solo handler y UN start', () => {
+    const fake = new FakeWipeScene();
+    wipeTo(fake as unknown as Phaser.Scene, SceneKey.ACTION);
+    wipeTo(fake as unknown as Phaser.Scene, SceneKey.ACTION);
+    expect(fake.cam.offCalls.length).toBe(1);
+    fake.cam.completeFade();
+    expect(fake.started.length).toBe(1);
+  });
+
+  it('wipe y transitionTo se disputan: gana la ÚLTIMA llamada (mismo guard compartido)', () => {
+    const fake = new FakeWipeScene();
+    wipeTo(fake as unknown as Phaser.Scene, SceneKey.ACTION);
+    transitionTo(fake as unknown as Phaser.Scene, SceneKey.QUIZ);
+    fake.cam.completeFade();
+    expect(fake.started).toEqual([[SceneKey.QUIZ, undefined]]);
+  });
+
+  it('tras completarse, la escena puede volver a transicionar (reusable)', () => {
+    const fake = new FakeWipeScene();
+    wipeTo(fake as unknown as Phaser.Scene, SceneKey.ACTION);
+    fake.cam.completeFade();
+    transitionTo(fake as unknown as Phaser.Scene, SceneKey.MENU);
+    fake.cam.completeFade();
+    expect(fake.started.map(([key]) => key)).toEqual([SceneKey.ACTION, SceneKey.MENU]);
   });
 });
 

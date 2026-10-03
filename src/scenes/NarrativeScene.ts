@@ -1,17 +1,355 @@
 /**
- * NARRATIVE (SPEC §3, §4.1): escena GENÉRICA que renderiza los paneles de
- * `lore[]` del `LevelConfig` activo (texto ≤ 40 palabras por panel, fondo
- * procedural por viñeta, avance por tap, «Saltar»).
+ * NARRATIVE (SPEC §3, §4.1 / PLAN Etapa 3): escena GENÉRICA que renderiza
+ * los paneles de `lore[]` del `LevelConfig` activo.
  *
- * PLACEHOLDER: escena vacía; se implementa en la Etapa 3.
+ *  - Nivel activo por scene-start data `{ levelId?: number }` (`activeLevelFor`,
+ *    default 1) — la escena no conoce ningún nivel concreto.
+ *  - Fondo procedural por panel según `LorePanel.background` ('street'/
+ *    'alley' → callejón nocturno con parallax de niebla y farolas en flicker;
+ *    'lab' → laboratorio con mesa y frascos con brillo verde/púrpura):
+ *    TODO lo que se pinta viene de la tabla `LORE_BACKGROUNDS` (datos).
+ *  - Panel de texto estilo pergamino oscuro (`ui/Panel`): el wrap lo calcula
+ *    `panelTextLayout` (puro, testeado) — nunca desborda. El parser de
+ *    `**negritas**` destaca la instrucción del panel final.
+ *  - Avance por tap en cualquier punto (capa de input bajo la UI) con
+ *    feedback sutil (crossfade + blip); indicador «1/4 … 4/4».
+ *  - Botón «Saltar» (esquina) → ACTION con fade.
+ *  - Tap en el ÚLTIMO panel → transición fade + wipe de niebla (`wipeTo`).
+ *
+ * La progresión la decide SIEMPRE el reducer puro `narrativeProgress`.
  */
 import Phaser from 'phaser';
+import {
+  LORE_BACKGROUNDS,
+  NARRATIVE_PANEL_LAYOUT,
+  NARRATIVE_PANEL_STYLE,
+  NARRATIVE_SCENE_LAYOUT,
+  NARRATIVE_SKIP_BUTTON,
+  NARRATIVE_TEXT_STYLE,
+  NarrativeAction,
+  activeLevelFor,
+  initialNarrativeState,
+  narrativeProgress,
+  panelTextLayout,
+  progressLabel as progressLabelText,
+  type LoreBackgroundDef,
+  type NarrativeProgressState,
+} from '../config/narrative';
+import { BASE_HEIGHT, BASE_WIDTH } from '../config/dimensions';
+import { hexToNumber, nightBackground } from '../config/palette';
+import { TEXTURE_KEYS } from '../art/textures';
+import {
+  driftOffset,
+  lampFlicker,
+  slotDrift,
+  type DriftParams,
+} from '../art/parallax';
 import { SceneKey } from '../config/sceneKeys';
+import type { LevelConfig, LoreBackground, LorePanel } from '../config/levels/types';
+import { fadeIn, transitionTo, wipeTo } from './sceneNav';
+import { getSystems } from '../systems/getSystems';
+import type { AudioSystem } from '../systems/AudioSystem';
+import { GothicButton } from '../ui/GothicButton';
+import { Panel } from '../ui/Panel';
+
+/** Datos de arranque (`scene.start(NARRATIVE, data)`), p. ej. desde MENU. */
+export interface NarrativeSceneData {
+  levelId?: number;
+}
+
+/** Un sprite de capa parallax con su deriva precalculada. */
+interface DriftingSprite {
+  sprite: Phaser.GameObjects.Image;
+  baseX: number;
+  drift: DriftParams;
+}
+
+/** Farola con su propio ritmo de flicker. */
+interface FlickeringLamp {
+  sprite: Phaser.GameObjects.Image;
+  speed: number;
+  phase: number;
+}
+
+/** Prop con brillo pulsante (frascos del laboratorio). */
+interface GlowingProp {
+  sprite: Phaser.GameObjects.Image;
+  baseAlpha: number;
+  phase: number;
+}
 
 export class NarrativeScene extends Phaser.Scene {
+  private level!: LevelConfig;
+  private progress!: NarrativeProgressState;
+  private audioSystem!: AudioSystem;
+
+  private backgroundType!: LoreBackground;
+  /** Todo lo pintado por el fondo actual (para trocar de viñeta). */
+  private backgroundObjects: Array<Phaser.GameObjects.Image | Phaser.GameObjects.Rectangle> = [];
+  private readonly drifting: DriftingSprite[] = [];
+  private readonly lamps: FlickeringLamp[] = [];
+  private readonly glowing: GlowingProp[] = [];
+
+  private panel!: Panel;
+  private progressText!: Phaser.GameObjects.Text;
+  /** True cuando ya se disparó la salida hacia ACTION (anti doble tap). */
+  private exiting = false;
+
   constructor() {
     super(SceneKey.NARRATIVE);
   }
 
-  create(): void {}
+  init(data: NarrativeSceneData = {}): void {
+    this.level = activeLevelFor(data.levelId);
+    this.progress = initialNarrativeState(this.level.lore.length);
+    this.exiting = false;
+    this.drifting.length = 0;
+    this.lamps.length = 0;
+    this.glowing.length = 0;
+    this.backgroundObjects = [];
+  }
+
+  create(): void {
+    const { audioSystem } = getSystems(this);
+    this.audioSystem = audioSystem;
+
+    fadeIn(this);
+    this.cameras.main.setBackgroundColor(nightBackground);
+
+    this.buildBackground(this.currentPanel().background, { animated: false });
+    this.buildPanel();
+    this.buildHud();
+    this.buildTapLayer();
+  }
+
+  update(time: number): void {
+    const t = time / 1000;
+    for (const entry of this.drifting) {
+      entry.sprite.x = entry.baseX + driftOffset(t, entry.drift);
+    }
+    for (const lamp of this.lamps) {
+      lamp.sprite.alpha = lampFlicker(t + lamp.phase, 0.78, lamp.speed);
+    }
+    for (const prop of this.glowing) {
+      prop.sprite.alpha = prop.baseAlpha * lampFlicker(t + prop.phase, 0.72, 1.6);
+    }
+  }
+
+  private currentPanel(): LorePanel {
+    return this.level.lore[Math.min(this.progress.index, this.progress.total - 1)];
+  }
+
+  // ---- Fondo procedural por viñeta (tabla LORE_BACKGROUNDS) ------------------
+
+  /**
+   * Construye el fondo del tipo pedido. Al cambiar de viñeta se troca con un
+   * velo de niebla que se disipa (crossfade sin pelearse con el flicker de
+   * las farolas, que sigue corriendo en `update`).
+   */
+  private buildBackground(type: LoreBackground, options: { animated: boolean }): void {
+    const def: LoreBackgroundDef = LORE_BACKGROUNDS[type];
+
+    if (options.animated) {
+      // Velo opaco sobre el fondo viejo: cubre el trocado instantáneo y se
+      // desvanece (depth 9: sobre el fondo, bajo el panel/UI).
+      const veil = this.add
+        .rectangle(BASE_WIDTH / 2, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, hexToNumber(nightBackground), 1)
+        .setDepth(9);
+      this.tweens.add({
+        targets: veil,
+        alpha: 0,
+        duration: NARRATIVE_SCENE_LAYOUT.fade.backgroundMs,
+        onComplete: () => veil.destroy(),
+      });
+    }
+
+    // Fuera el fondo anterior; reset de los registros de animación.
+    for (const obj of this.backgroundObjects) {
+      obj.destroy();
+    }
+    this.backgroundObjects = [];
+    this.drifting.length = 0;
+    this.lamps.length = 0;
+    this.glowing.length = 0;
+    this.backgroundType = type;
+
+    // Banda de suelo/adoquines (solo exteriores).
+    if (def.ground) {
+      const ground = this.add
+        .rectangle(
+          BASE_WIDTH / 2,
+          (def.ground.y + BASE_HEIGHT) / 2,
+          BASE_WIDTH,
+          BASE_HEIGHT - def.ground.y,
+          hexToNumber(def.ground.color),
+        )
+        .setDepth(0.5);
+      this.backgroundObjects.push(ground);
+    }
+
+    // Capas con deriva: siluetas, niebla y farolas (flicker en runtime).
+    def.layers.forEach((layer, layerIndex) => {
+      for (const slot of layer.slots) {
+        const sprite = this.add
+          .image(slot.x, slot.y, layer.key)
+          .setScale(slot.scale)
+          .setAlpha(layer.alpha)
+          .setDepth(layer.depth);
+        if (layer.tint) {
+          sprite.setTint(hexToNumber(layer.tint));
+        }
+        this.backgroundObjects.push(sprite);
+        this.drifting.push({ sprite, baseX: slot.x, drift: slotDrift(layer, slot) });
+        if (layer.key === TEXTURE_KEYS.lampPost) {
+          this.lamps.push({ sprite, speed: 4.2 + layerIndex * 1.3, phase: slot.phaseOffset });
+        }
+      }
+    });
+
+    // Props estáticos encima (mesa y frascos del laboratorio).
+    def.props.forEach((prop, propIndex) => {
+      const sprite = this.add
+        .image(prop.x, prop.y, prop.key)
+        .setScale(prop.scale)
+        .setAlpha(prop.alpha)
+        .setDepth(prop.depth);
+      if (prop.tint) {
+        sprite.setTint(hexToNumber(prop.tint));
+      }
+      this.backgroundObjects.push(sprite);
+      if (prop.glow) {
+        this.glowing.push({ sprite, baseAlpha: prop.alpha, phase: propIndex * 0.9 });
+      }
+    });
+  }
+
+  // ---- Panel de texto (pergamino oscuro) --------------------------------------
+
+  private buildPanel(): void {
+    const { panelCenter, depths } = NARRATIVE_SCENE_LAYOUT;
+    this.panel = new Panel(this, panelCenter.x, panelCenter.y, {
+      width: NARRATIVE_PANEL_LAYOUT.panelWidth,
+      height: NARRATIVE_PANEL_LAYOUT.panelHeight,
+      style: NARRATIVE_PANEL_STYLE,
+    }).setDepth(depths.panel);
+
+    const layout = panelTextLayout(this.currentPanel().text);
+    this.panel.setWrappedLines(layout.lines, NARRATIVE_PANEL_LAYOUT, NARRATIVE_TEXT_STYLE);
+    // Entrada del contenido con el mismo fade sutil del avance.
+    this.panel.contentContainer.setAlpha(0);
+    this.tweens.add({
+      targets: this.panel.contentContainer,
+      alpha: { from: 0, to: 1 },
+      duration: NARRATIVE_SCENE_LAYOUT.fade.contentInMs,
+      ease: 'Sine.easeInOut',
+    });
+  }
+
+  // ---- Indicador de progreso + «Saltar» ---------------------------------------
+
+  private buildHud(): void {
+    const { progress, skipButton, depths, progressStyle } = NARRATIVE_SCENE_LAYOUT;
+    this.progressText = this.add
+      .text(progress.x, progress.y, progressLabelText(this.progress), {
+        fontFamily: progressStyle.fontFamily,
+        fontSize: `${progressStyle.fontSize}px`,
+        color: progressStyle.color,
+      })
+      .setOrigin(0, 0.5)
+      .setDepth(depths.ui);
+
+    new GothicButton(this, skipButton.x, skipButton.y, {
+      label: NARRATIVE_SKIP_BUTTON.label,
+      layout: NARRATIVE_SKIP_BUTTON.layout,
+      onPress: (): void => this.onSkip(),
+    }).setDepth(depths.ui);
+  }
+
+  // ---- Capa de tap (avance por pointerdown) -----------------------------------
+
+  private buildTapLayer(): void {
+    // Rectángulo invisible BAJO toda la UI: con input topOnly, el botón
+    // «Saltar» (depth mayor) se queda con sus taps y el resto avanza la viñeta.
+    this.add
+      .rectangle(BASE_WIDTH / 2, BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT, 0x000000, 0)
+      .setDepth(-1)
+      .setInteractive({
+        hitArea: new Phaser.Geom.Rectangle(-BASE_WIDTH / 2, -BASE_HEIGHT / 2, BASE_WIDTH, BASE_HEIGHT),
+        hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+      })
+      .on(Phaser.Input.Events.POINTER_DOWN, () => this.onTap());
+  }
+
+  // ---- Progresión (el reducer puro decide) ------------------------------------
+
+  private onTap(): void {
+    if (this.exiting) {
+      return;
+    }
+    const next = narrativeProgress(this.progress, NarrativeAction.Tap);
+    if (next === this.progress) {
+      return; // ya done (no debería llegar aquí con el guard, pero es gratis)
+    }
+    this.progress = next;
+    if (next.done) {
+      // Tap sobre el último panel: la niebla lo cubre todo → ACTION.
+      this.exitToAction();
+      return;
+    }
+    this.renderPanel(true);
+  }
+
+  private onSkip(): void {
+    if (this.exiting) {
+      return;
+    }
+    this.exiting = true;
+    this.audioSystem.blip();
+    // «Saltar» pide prisa: fade directo (sin wipe teatral).
+    transitionTo(this, SceneKey.ACTION, { levelId: this.level.id });
+  }
+
+  private exitToAction(): void {
+    this.exiting = true;
+    // Sweep de viento de la transición (SPEC §8), si el gesto desbloqueó el audio.
+    if (this.audioSystem.isUnlocked) {
+      this.audioSystem.wind(1.6);
+    }
+    wipeTo(this, SceneKey.ACTION, { levelId: this.level.id });
+  }
+
+  /** Pinta el panel ACTUAL (`this.progress.index`) con feedback sutil. */
+  private renderPanel(animated: boolean): void {
+    const panelData = this.currentPanel();
+    if (panelData.background !== this.backgroundType) {
+      this.buildBackground(panelData.background, { animated: true });
+    }
+
+    this.progressText.setText(progressLabelText(this.progress));
+
+    const layout = panelTextLayout(panelData.text);
+    if (!animated) {
+      this.panel.setWrappedLines(layout.lines, NARRATIVE_PANEL_LAYOUT, NARRATIVE_TEXT_STYLE);
+      return;
+    }
+
+    // Feedback sutil de avance: blip + crossfade del contenido del panel.
+    this.audioSystem.blip();
+    const content = this.panel.contentContainer;
+    this.tweens.killTweensOf(content);
+    this.tweens.add({
+      targets: content,
+      alpha: 0,
+      duration: NARRATIVE_SCENE_LAYOUT.fade.contentOutMs,
+      onComplete: () => {
+        this.panel.setWrappedLines(layout.lines, NARRATIVE_PANEL_LAYOUT, NARRATIVE_TEXT_STYLE);
+        this.tweens.add({
+          targets: content,
+          alpha: { from: 0, to: 1 },
+          duration: NARRATIVE_SCENE_LAYOUT.fade.contentInMs,
+          ease: 'Sine.easeInOut',
+        });
+      },
+    });
+  }
 }

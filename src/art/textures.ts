@@ -29,6 +29,7 @@ import {
   parchmentDark,
   parchmentLight,
   potionPurple,
+  street,
   textPrimary,
 } from '../config/palette';
 
@@ -68,6 +69,10 @@ export const TEXTURE_KEYS = {
   speakerOn: 'speaker-on',
   /** Altavoz con X: silencio (toggle de mute, SPEC §8). */
   speakerOff: 'speaker-off',
+  /** Mesa de laboratorio del fondo «lab» (Etapa 3: narrativa, SPEC §7.2). */
+  labBench: 'lab-bench',
+  /** Matraz Erlenmeyer neutro: se tiñe (verde/púrpura) vía tint del prop. */
+  labFlask: 'lab-flask',
 } as const;
 
 /**
@@ -289,10 +294,81 @@ function drawSpeakerOff(g: Phaser.GameObjects.Graphics): void {
   g.strokePath();
 }
 
+// ---- Texturas de la Etapa 3 (fondo «lab» de la narrativa, SPEC §4.1/§7.2) ----
+
+/**
+ * Mesa de laboratorio (720 px de ancho: ocupa todo el fondo del panel 2).
+ * Tablero oscuro con canto, faldón, patas y travesaño; un reflejo tenue de
+ * fuego de farola sobre el tablero lo separa del fondo nocturno.
+ */
+function drawLabBench(g: Phaser.GameObjects.Graphics): void {
+  const wood = hexToNumber(buildings);
+  const top = hexToNumber(street);
+  const apron = hexToNumber(parchmentDark);
+  const sheen = hexToNumber(lampFire);
+  // Tablero con canto (madera oscura).
+  g.fillStyle(top, 1);
+  g.fillRect(0, 40, 720, 34);
+  g.fillStyle(wood, 1);
+  g.fillRect(0, 74, 720, 14);
+  // Faldón bajo el tablero.
+  g.fillStyle(apron, 1);
+  g.fillRect(0, 88, 720, 10);
+  // Patas y travesaño.
+  g.fillStyle(wood, 1);
+  g.fillRect(48, 98, 30, 162);
+  g.fillRect(642, 98, 30, 162);
+  g.fillRect(48, 170, 624, 14);
+  // Reflejo tenue del vidrio/luz sobre el tablero.
+  g.fillStyle(sheen, 0.12);
+  g.fillRect(0, 40, 720, 6);
+}
+
+/**
+ * Matraz Erlenmeyer NEUTRO (se tiñe en runtime con `tint`: verde laboratorio
+ * o púrpura poción, según el prop de `LORE_BACKGROUNDS`). Doble halo suave
+ * (el «brillo» que pulsa en runtime), contorno de vidrio claro, líquido en
+ * el cono inferior con burbujas y corcho oscuro.
+ */
+function drawLabFlask(g: Phaser.GameObjects.Graphics): void {
+  const glass = hexToNumber(textPrimary);
+  const neutral = hexToNumber(parchmentLight);
+  const cork = hexToNumber(parchmentDark);
+  // Halos del brillo (el tint del prop los colorea en runtime).
+  g.fillStyle(neutral, 0.14);
+  g.fillCircle(48, 64, 44);
+  g.fillStyle(neutral, 0.2);
+  g.fillCircle(48, 70, 30);
+  // Líquido: cono inferior (el tint lo vuelve verde/púrpura).
+  g.fillStyle(neutral, 0.92);
+  g.fillTriangle(30, 96, 66, 96, 48, 70);
+  // Burbujas ascendiendo.
+  g.fillStyle(neutral, 0.5);
+  g.fillCircle(44, 86, 4);
+  g.fillCircle(54, 78, 3);
+  // Contorno de vidrio: cuello + cono, en un solo trazo.
+  g.lineStyle(4, glass, 0.85);
+  g.beginPath();
+  g.moveTo(40, 10);
+  g.lineTo(40, 48);
+  g.lineTo(16, 96);
+  g.lineTo(80, 96);
+  g.lineTo(56, 48);
+  g.lineTo(56, 10);
+  g.strokePath();
+  // Brillo lateral del cuello.
+  g.fillStyle(glass, 0.35);
+  g.fillRect(42, 14, 4, 30);
+  // Corcho.
+  g.fillStyle(cork, 1);
+  g.fillRect(36, 2, 24, 10);
+}
+
 /**
  * Registro de texturas: primera hornada (PLAN Etapa 1) + iconos de la
- * Etapa 2 («Cómo jugar» y toggle de mute). Hornadas futuras (niña, Hyde,
- * adoquines, sello de cera…) se añaden aquí o en registros posteriores.
+ * Etapa 2 («Cómo jugar» y toggle de mute) + fondo «lab» de la Etapa 3.
+ * Hornadas futuras (niña, Hyde, sello de cera…) se añaden aquí o en
+ * registros posteriores.
  */
 export const TEXTURE_DEFS: readonly TextureDef[] = [
   {
@@ -362,8 +438,23 @@ export const TEXTURE_DEFS: readonly TextureDef[] = [
     key: TEXTURE_KEYS.speakerOff,
     width: 96,
     height: 96,
-    description: 'Altavoz con aspa: silencio (toggle de mute del menú).',
+    description: 'Altavoz con aspa: silencio (toggle de mute).',
     draw: drawSpeakerOff,
+  },
+  {
+    key: TEXTURE_KEYS.labBench,
+    width: 720,
+    height: 260,
+    description: 'Mesa de laboratorio del fondo narrativo «lab» (Etapa 3).',
+    draw: drawLabBench,
+  },
+  {
+    key: TEXTURE_KEYS.labFlask,
+    width: 96,
+    height: 128,
+    description:
+      'Matraz Erlenmeyer neutro, teñible vía tint (verde/púrpura) para el laboratorio.',
+    draw: drawLabFlask,
   },
 ];
 

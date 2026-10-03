@@ -12,7 +12,7 @@
  */
 
 import type { HexColor } from '../config/palette';
-import { fogFar, fogMid, fogNear } from '../config/palette';
+import { fogFar, fogMid, fogNear, labGreen, potionPurple } from '../config/palette';
 import { TEXTURE_KEYS } from './textures';
 
 /** Parámetros de la deriva sinusoidal de una capa. */
@@ -141,6 +141,188 @@ export function slotDrift(layer: ParallaxLayer, slot: ParallaxSlot): DriftParams
     phase: layer.drift.phase + slot.phaseOffset,
   };
 }
+
+// ---- Fondos narrativos (Etapa 3, PLAN) ---------------------------------------
+//
+// Los tres fondos de las viñetas (`LoreBackground` de `config/levels/types`):
+// la mitad INFERIOR del lienzo la tapa el panel de texto (ver
+// `NARRATIVE_SCENE_LAYOUT` en `config/narrative.ts`), así que la composición
+// concentra siluetas, farolas y vapor en la banda superior (~0–700 px).
+
+/**
+ * Fondo «street» (panel 1: calle londinense amplia, «la niebla traga las
+ * farolas»): fachadas en silueta, dos farolas y niebla MÁS densa que en el
+ * menú (alfas algo mayores).
+ */
+export const STREET_PARALLAX_LAYERS: readonly ParallaxLayer[] = [
+  {
+    // Fachadas de la calle: siluetas más bajas y espaciadas (calle ancha).
+    key: TEXTURE_KEYS.building,
+    alpha: 1,
+    depth: 1,
+    drift: { speed: 0.05, amplitude: 4, phase: 0.3 },
+    slots: [
+      { x: 30, y: 820, scale: 0.62, phaseOffset: 0 },
+      { x: 260, y: 835, scale: 0.7, phaseOffset: SLOT_PHASE_STEP },
+      { x: 490, y: 826, scale: 0.66, phaseOffset: SLOT_PHASE_STEP * 2 },
+      { x: 700, y: 832, scale: 0.72, phaseOffset: SLOT_PHASE_STEP * 3 },
+    ],
+  },
+  {
+    // Niebla lejana: banda alta que «traga» el cielo.
+    key: TEXTURE_KEYS.fog,
+    tint: fogFar,
+    alpha: 0.26,
+    depth: 2,
+    drift: { speed: 0.14, amplitude: 34, phase: 0.6 },
+    slots: [
+      { x: 150, y: 300, scale: 3.0, phaseOffset: 0 },
+      { x: 560, y: 380, scale: 3.2, phaseOffset: SLOT_PHASE_STEP * 2 },
+    ],
+  },
+  {
+    // Farolas: cabezas visibles sobre el borde del panel (flicker en runtime).
+    key: TEXTURE_KEYS.lampPost,
+    alpha: 1,
+    depth: 3,
+    drift: { speed: 0.06, amplitude: 3, phase: 2.3 },
+    slots: [
+      { x: 150, y: 750, scale: 1, phaseOffset: 0 },
+      { x: 585, y: 762, scale: 1.08, phaseOffset: SLOT_PHASE_STEP },
+    ],
+  },
+  {
+    // Niebla media: envuelve los faroles.
+    key: TEXTURE_KEYS.fog,
+    tint: fogMid,
+    alpha: 0.2,
+    depth: 4,
+    drift: { speed: 0.22, amplitude: 46, phase: 1.7 },
+    slots: [
+      { x: 40, y: 560, scale: 3.3, phaseOffset: 0 },
+      { x: 500, y: 640, scale: 3.5, phaseOffset: SLOT_PHASE_STEP * 2 },
+    ],
+  },
+  {
+    // Niebla cercana: rasga el borde superior del panel.
+    key: TEXTURE_KEYS.fog,
+    tint: fogNear,
+    alpha: 0.14,
+    depth: 5,
+    drift: { speed: 0.32, amplitude: 58, phase: 3.8 },
+    slots: [
+      { x: 230, y: 680, scale: 3.6, phaseOffset: 0 },
+      { x: 720, y: 700, scale: 3.8, phaseOffset: SLOT_PHASE_STEP * 2 },
+    ],
+  },
+];
+
+/**
+ * Fondo «alley» (paneles 3–4: callejón estrecho): fachadas MÁS cercanas y
+ * grandes (sensación de pared que se cierra), una sola farola y niebla baja.
+ */
+export const ALLEY_PARALLAX_LAYERS: readonly ParallaxLayer[] = [
+  {
+    // Fachadas grandes y apretadas: el callejón se estrecha.
+    key: TEXTURE_KEYS.building,
+    alpha: 1,
+    depth: 1,
+    drift: { speed: 0.06, amplitude: 6, phase: 1.1 },
+    slots: [
+      { x: 70, y: 800, scale: 0.95, phaseOffset: 0 },
+      { x: 370, y: 812, scale: 1.05, phaseOffset: SLOT_PHASE_STEP },
+      { x: 665, y: 806, scale: 0.98, phaseOffset: SLOT_PHASE_STEP * 2.2 },
+    ],
+  },
+  {
+    // Niebla lejana colgada del fondo del callejón.
+    key: TEXTURE_KEYS.fog,
+    tint: fogFar,
+    alpha: 0.22,
+    depth: 2,
+    drift: { speed: 0.17, amplitude: 28, phase: 0.9 },
+    slots: [
+      { x: 120, y: 330, scale: 3.1, phaseOffset: 0 },
+      { x: 590, y: 300, scale: 2.9, phaseOffset: SLOT_PHASE_STEP * 2 },
+    ],
+  },
+  {
+    // Una única farola: el callejón es pobre y oscuro.
+    key: TEXTURE_KEYS.lampPost,
+    alpha: 1,
+    depth: 3,
+    drift: { speed: 0.07, amplitude: 3, phase: 2.5 },
+    slots: [{ x: 500, y: 742, scale: 1.1, phaseOffset: 0 }],
+  },
+  {
+    // Niebla media.
+    key: TEXTURE_KEYS.fog,
+    tint: fogMid,
+    alpha: 0.18,
+    depth: 4,
+    drift: { speed: 0.25, amplitude: 42, phase: 2.2 },
+    slots: [
+      { x: 0, y: 580, scale: 3.4, phaseOffset: 0 },
+      { x: 480, y: 650, scale: 3.6, phaseOffset: SLOT_PHASE_STEP * 2 },
+    ],
+  },
+  {
+    // Niebla cercana: la que «lo cubre todo» en el panel final.
+    key: TEXTURE_KEYS.fog,
+    tint: fogNear,
+    alpha: 0.12,
+    depth: 5,
+    drift: { speed: 0.34, amplitude: 60, phase: 0.7 },
+    slots: [
+      { x: 250, y: 690, scale: 3.7, phaseOffset: 0 },
+      { x: 740, y: 660, scale: 3.9, phaseOffset: SLOT_PHASE_STEP * 2 },
+    ],
+  },
+];
+
+/**
+ * Fondo «lab» (panel 2: laboratorio de Jekyll): SIN edificios ni farolas —
+ * vapor de experimentos en dos tonos (bruma púrpura de los polvos + vapor
+ * verde de la poción) que respira sobre la mesa (props en `LORE_BACKGROUNDS`).
+ */
+export const LAB_PARALLAX_LAYERS: readonly ParallaxLayer[] = [
+  {
+    // Bruma púrpura alta: los polvos suspendidos en el aire.
+    key: TEXTURE_KEYS.fog,
+    tint: potionPurple,
+    alpha: 0.1,
+    depth: 1,
+    drift: { speed: 0.12, amplitude: 30, phase: 0.2 },
+    slots: [
+      { x: 160, y: 240, scale: 3.4, phaseOffset: 0 },
+      { x: 560, y: 420, scale: 3.2, phaseOffset: SLOT_PHASE_STEP * 2 },
+    ],
+  },
+  {
+    // Vapor verde medio: el aliento de la poción.
+    key: TEXTURE_KEYS.fog,
+    tint: labGreen,
+    alpha: 0.14,
+    depth: 2,
+    drift: { speed: 0.2, amplitude: 40, phase: 1.4 },
+    slots: [
+      { x: 60, y: 400, scale: 3.3, phaseOffset: 0 },
+      { x: 620, y: 520, scale: 3.5, phaseOffset: SLOT_PHASE_STEP * 2.3 },
+    ],
+  },
+  {
+    // Vapor verde cercano: rueda sobre la mesa.
+    key: TEXTURE_KEYS.fog,
+    tint: labGreen,
+    alpha: 0.1,
+    depth: 3,
+    drift: { speed: 0.3, amplitude: 52, phase: 3.0 },
+    slots: [
+      { x: 300, y: 620, scale: 3.6, phaseOffset: 0 },
+      { x: 720, y: 560, scale: 3.4, phaseOffset: SLOT_PHASE_STEP * 1.8 },
+    ],
+  },
+];
 
 // ---- Flicker de farolas -------------------------------------------------------
 
