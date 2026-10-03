@@ -354,7 +354,9 @@ export const NARRATIVE_SCENE_LAYOUT = {
   /** Profundidades: fondo (capas 0–5 + props 6–8) < panel < UI. */
   depths: { panel: 10, ui: 12, propStart: 6 },
   /** Timing de los crossfades de avance (feedback sutil, ms). */
-  fade: { contentOutMs: 110, contentInMs: 200, backgroundMs: 280 },
+  // Etapa 7 (pulido): 110/200/280 → 130/240/320 — crossfades un pelín más
+  // largos para que el cambio de viñeta se lea sin parpadeo (ritmo infantil).
+  fade: { contentOutMs: 130, contentInMs: 240, backgroundMs: 320 },
   /** Tipografía del indicador «1/4». */
   progressStyle: {
     fontFamily: '"Special Elite", Georgia, serif',

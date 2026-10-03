@@ -33,14 +33,12 @@
 import { BASE_WIDTH } from '../config/dimensions';
 import type { HexColor } from '../config/palette';
 import {
-  fogNear,
   labGreen,
   lampFire,
   nightBackground,
   parchmentDark,
   parchmentLight,
   potionPurple,
-  success,
   textPrimary,
 } from '../config/palette';
 import { TEXTURE_KEYS } from '../art/textures';
@@ -291,13 +289,19 @@ export const VICTORY_LAYOUT = {
     color: parchmentDark,
     alpha: 0.45,
   },
-  /** Pista de firma al pie del diploma (tenue, no estorba). */
+  /**
+   * Pista de firma al pie del diploma (no estorba).
+   * Etapa 7 (QA accesibilidad): fogNear → parchmentDark. La pista pinta
+   * sobre el PERGAMINO CLARO del diploma y a 20 px es texto normal
+   * (≥ 4.5:1, WCAG 1.4.3): fogNear daba 2.41:1 (ilegible); la tinta sepia
+   * da 9.14:1. «Tenue» pasa a lograrlo por el tamaño (20 px), no por color.
+   */
   hint: {
     text: VICTORY_LABELS.nameHint,
     centerY: 992,
     fontSize: 20,
     fontFamily: '"Special Elite", Georgia, serif',
-    color: fogNear,
+    color: parchmentDark,
   },
   /** Placa del desglose (inset oscuro, patrón placa del quiz). */
   plaque: {
@@ -325,13 +329,20 @@ export const VICTORY_LAYOUT = {
     separatorColor: parchmentLight,
     separatorAlpha: 0.35,
   },
-  /** Línea del récord, bajo la placa (verde success si es nuevo). */
+  /**
+   * Línea del récord, bajo la placa (púrpura poción si es nuevo).
+   * Etapa 7 (QA accesibilidad): el rótulo pinta sobre el PERGAMINO CLARO
+   * del diploma (no sobre la placa oscura): textPrimary daba 1.28:1 y
+   * success 1.54:1 — ilegibles. Ahora: parchmentDark 9.14:1 (rótulo normal)
+   * y potionPurple 3.83:1 (variante «¡Nuevo récord!», texto grande 26 px
+   * ≥ 24 px → mín. 3:1, WCAG 1.4.3).
+   */
   record: {
     centerY: 850,
     fontSize: 26,
     fontFamily: '"Special Elite", Georgia, serif',
-    newRecordColor: success,
-    color: textPrimary,
+    newRecordColor: potionPurple,
+    color: parchmentDark,
   },
   /** Sello de cera púrpura (textura nueva de la Etapa 6). */
   seal: {

@@ -132,18 +132,35 @@ export const ACTION_FEEDBACK = {
   flashMs: 120,
   /** Micro-shake de cámara: ≤ 150 ms, suave (SPEC §7.2). */
   shakeMs: 120,
-  /** Intensidad del shake (fracción del viewport): apenas un temblor. */
-  shakeIntensity: 0.004,
+  /**
+   * Intensidad del shake (fracción del viewport): apenas un temblor.
+   * Etapa 7 (pulido): 0.004 → 0.0035 — sigue leyéndose como «micro»
+   * (SPEC §7.2) y no compite con el movimiento errático de la niña.
+   */
+  shakeIntensity: 0.0035,
   /** «!» y «+10» flotantes: suben y se desvanecen. */
   floatMs: 550,
   /** Puff de niebla del tap al aire: crece y se disipa. */
   puffMs: 420,
-  /** La niña «sale corriendo» tras el susto: mini-estallido y regreso. */
-  scareMs: 480,
-  /** Huida final de la niña al lograr la meta (tween fuera de pantalla). */
-  fleeMs: 750,
-  /** Cola antes de arrancar el QUIZ tras la huida. */
-  exitDelayMs: 1150,
+  /**
+   * La niña «sale corriendo» tras el susto: mini-estallido y regreso.
+   * Etapa 7 (pulido): 480 → 560 — se queda oculta MÁS tiempo del que tarda
+   * el estallido de puffs en disiparse (puffMs + delay escalonado ≈ 540),
+   * de modo que la niebla se limpia antes de que reaparezca.
+   */
+  scareMs: 560,
+  /**
+   * Huida final de la niña al lograr la meta (tween fuera de pantalla).
+   * Etapa 7 (pulido): 750 → 850 — la huida es el pago emocional de la
+   * tanda; un pelín más de tiempo la deja leerse completa.
+   */
+  fleeMs: 850,
+  /**
+   * Cola antes de arrancar el QUIZ tras la huida.
+   * Etapa 7 (pulido): 1150 → 1250 — mantiene el colchón sobre fleeMs
+   * (≥, testeado) y da margen al «+bonus» flotante (floatMs) antes del fade.
+   */
+  exitDelayMs: 1250,
 } as const;
 
 /** Estilo del «!» sobre la niña y del «+10» flotante. */

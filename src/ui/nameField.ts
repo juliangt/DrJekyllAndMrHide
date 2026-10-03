@@ -29,6 +29,8 @@
  * autoplay/focus de los navegadores) y lo oculta al confirmar.
  */
 
+import { fitScale } from './fitScale';
+
 /** Rect CSS del canvas (lo que devuelve `getBoundingClientRect()`). */
 export interface CanvasRectLike {
   left: number;
@@ -58,6 +60,10 @@ export interface CssPlacement {
  * rect del canvas: `scale = min(rectW/baseW, rectH/baseH)` y el punto se
  * centra con los offsets de letterbox (0 con Scale.FIT, que conserva el
  * aspecto). Entradas no finitas o rect degenerado → escala 0 y sin NaN.
+ *
+ * Etapa 7: la matemática FIT + CENTER_BOTH vive en `ui/fitScale.ts`
+ * (extraída para el QA responsive de la cadena 320→1920 px) y este mapeo
+ * la REUTILIZA — una sola fuente de verdad para la escala.
  */
 export function canvasPointToCss(
   point: GamePoint,
@@ -71,18 +77,12 @@ export function canvasPointToCss(
     width: Number.isFinite(canvasRect.width) ? canvasRect.width : 0,
     height: Number.isFinite(canvasRect.height) ? canvasRect.height : 0,
   };
-  const scale =
-    baseWidth > 0 && baseHeight > 0
-      ? Math.min(safeRect.width / baseWidth, safeRect.height / baseHeight)
-      : 0;
-  const safeScale = Number.isFinite(scale) && scale > 0 ? scale : 0;
   // Letterbox de Scale.FIT + CENTER_BOTH: el juego queda centrado en el rect.
-  const offsetX = (safeRect.width - baseWidth * safeScale) / 2;
-  const offsetY = (safeRect.height - baseHeight * safeScale) / 2;
+  const fit = fitScale(safeRect.width, safeRect.height, baseWidth, baseHeight);
   return {
-    left: safeRect.left + offsetX + point.x * safeScale,
-    top: safeRect.top + offsetY + point.y * safeScale,
-    scale: safeScale,
+    left: safeRect.left + fit.letterboxX + point.x * fit.scale,
+    top: safeRect.top + fit.letterboxY + point.y * fit.scale,
+    scale: fit.scale,
   };
 }
 

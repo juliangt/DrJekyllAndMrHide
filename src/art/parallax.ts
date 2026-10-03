@@ -386,11 +386,14 @@ export const ACTION_PARALLAX_LAYERS: readonly ParallaxLayer[] = [
   },
   {
     // Niebla frontal: la más rápida y clara, rueda por delante del callejón.
+    // Etapa 7 (pulido): speed 0.34 → 0.30 y amplitud 58 → 52 — en el
+    // minijuego el fondo no debe competir con la niña errática: deriva algo
+    // más lenta y acotada (sigue siendo la capa más viva del callejón).
     key: TEXTURE_KEYS.fog,
     tint: fogNear,
     alpha: 0.12,
     depth: 5,
-    drift: { speed: 0.34, amplitude: 58, phase: 3.3 },
+    drift: { speed: 0.3, amplitude: 52, phase: 3.3 },
     slots: [
       { x: 240, y: 900, scale: 3.6, phaseOffset: 0 },
       { x: 760, y: 960, scale: 3.8, phaseOffset: SLOT_PHASE_STEP * 2 },
