@@ -187,7 +187,7 @@ Tareas:
 
 - [ ] Funciona 100 % client-side; sin llamadas de red tras la carga (salvo fuentes en el primer load).
 - [ ] Responsive verificado de 320 px a 1920 px, táctil y mouse.
-- [ ] Flujo completo jugable: Menu → Narrativa → Acción → Quiz → Victoria.
+- [ ] Flujo completo jugable: Menu → Intro → Narrativa → Acción → Quiz → Victoria.
 - [ ] Reglas de fallo correctas: timeout reintenta minijuego; quiz incorrecto reinicia nivel completo.
 - [ ] Puntaje conforme a SPEC §5, con desglose en la pantalla final.
 - [ ] Progreso y mute persisten tras recargar en cualquier estado; save corrupto no rompe el juego.
