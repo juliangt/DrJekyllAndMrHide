@@ -46,6 +46,7 @@ import {
   FPS_DEBUG_STYLE,
 } from '../gameplay/actionLayout';
 import { GAME_OVER_STYLE } from '../gameplay/gameOverOverlay';
+import { INTRO_SCENE_LAYOUT } from '../config/intro';
 import {
   QUIZ_ACTION_BUTTON,
   QUIZ_LAYOUT,
@@ -149,6 +150,9 @@ const CONTRAST_PAIRS: readonly ContrastPair[] = [
   { where: 'acción: «!» flotante', foreground: ACTION_FLOAT_STYLE.exclamation.color, background: BG.street, fontSizePx: ACTION_FLOAT_STYLE.exclamation.fontSize },
   { where: 'acción: «+10» flotante', foreground: ACTION_FLOAT_STYLE.points.color, background: BG.street, fontSizePx: ACTION_FLOAT_STYLE.points.fontSize },
   { where: 'acción: FPS debug (?debug)', foreground: FPS_DEBUG_STYLE.color, background: BG.night, fontSizePx: FPS_DEBUG_STYLE.fontSize },
+
+  // Intro (config/intro.ts — letrero sobre el pergamino claro del marco)
+  { where: 'intro: letrero del beat', foreground: INTRO_SCENE_LAYOUT.caption.style.color, background: BG.parchmentLight, fontSizePx: INTRO_SCENE_LAYOUT.caption.style.fontSize },
 
   // GAME_OVER (gameplay/gameOverOverlay.ts, panel = pergamino claro)
   { where: 'game over: título', foreground: GAME_OVER_STYLE.title.color as HexColor, background: BG.parchmentLight, fontSizePx: GAME_OVER_STYLE.title.fontSize },

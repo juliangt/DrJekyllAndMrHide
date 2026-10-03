@@ -31,7 +31,7 @@
  */
 
 import { BASE_WIDTH } from './dimensions';
-import { fogNear, labGreen, lampFire, potionPurple, textPrimary } from './palette';
+import { fogNear, labGreen, lampFire, parchmentDark, potionPurple } from './palette';
 import { TEXTURE_KEYS } from '../art/textures';
 import type { HexColor } from './palette';
 
@@ -337,7 +337,9 @@ export const INTRO_SCENE_LAYOUT = {
     style: {
       fontFamily: '"Crimson Text", Georgia, serif',
       fontSize: 32,
-      color: textPrimary,
+      // Tinta sepia sobre el pergamino CLARO de `parchment-frame` (~9:1 de
+      // contraste, SPEC §9) — mismo patrón que «Cómo jugar» y GAME_OVER.
+      color: parchmentDark,
       /** Ancho de wrap del letrero (panel − 2·padding ≈ 560 px). */
       wordWrapWidth: 560,
     },
