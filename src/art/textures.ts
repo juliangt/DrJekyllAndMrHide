@@ -77,6 +77,10 @@ export const TEXTURE_KEYS = {
   girl: 'girl',
   /** Sello de cera púrpura del diploma de victoria (Etapa 6, SPEC §6). */
   waxSeal: 'wax-seal',
+  /** El Dr. Jekyll: doctor recto con bata clara y copa, frasco en mano (intro). */
+  jekyll: 'jekyll',
+  /** Mr. Hyde: silueta jorobada y bestia de la transformación (intro). */
+  hyde: 'hyde',
 } as const;
 
 /**
@@ -467,11 +471,164 @@ function drawWaxSeal(g: Phaser.GameObjects.Graphics): void {
   g.fillCircle(44, 40, 9);
 }
 
+// ---- Texturas de la intro (cinemática pre-nivel, PLAN fase 1/3) --------------
+
+/**
+ * El Dr. Jekyll (intro, acto 1): doctor RECTO y elegante — sombrero de copa,
+ * bata de laboratorio clara (parchmentLight) con botones, y un matraz
+ * Erlenmeyer levantado en la mano derecha (mismo lenguaje de vidrio/líquido
+ * que `lab-flask`, aquí con el líquido YA verde: es su fórmula terminada).
+ * Silueta legible y amable — es el «antes» de la transformación. La animación
+ * (entrada, inclinación al beber, crossfade) es runtime, no parte de la
+ * textura. Determinista.
+ */
+function drawJekyll(g: Phaser.GameObjects.Graphics): void {
+  const dark = hexToNumber(buildings); // cabeza, sombrero, manos y piernas
+  const coat = hexToNumber(parchmentLight); // bata de laboratorio clara
+  const ink = hexToNumber(parchmentDark); // cinta del sombrero y botones
+  const glass = hexToNumber(textPrimary); // contorno del vidrio y camisa
+  const liquid = hexToNumber(labGreen); // la fórmula
+
+  // Halo del frasco (la poción «respira» aunque la textura es estática).
+  g.fillStyle(liquid, 0.12);
+  g.fillCircle(100, 44, 20);
+
+  // Brazo izquierdo colgando (manga de la bata) + mano.
+  g.fillStyle(coat, 1);
+  g.fillTriangle(44, 88, 30, 132, 50, 136);
+  g.fillStyle(dark, 1);
+  g.fillCircle(36, 140, 6);
+
+  // Bata: torso + faldón acampanado en dos paños.
+  g.fillStyle(coat, 1);
+  g.fillRect(42, 76, 44, 92);
+  g.fillTriangle(42, 148, 26, 196, 54, 196);
+  g.fillTriangle(86, 148, 102, 196, 74, 196);
+  // Camisa asomando (V del cuello) y botones.
+  g.fillStyle(glass, 1);
+  g.fillTriangle(56, 76, 72, 76, 64, 94);
+  g.fillStyle(ink, 1);
+  g.fillRect(62, 102, 4, 4);
+  g.fillRect(62, 116, 4, 4);
+  g.fillRect(62, 130, 4, 4);
+
+  // Brazo derecho en alto (manga) sujetando el matraz.
+  g.fillStyle(coat, 1);
+  g.fillTriangle(80, 86, 98, 62, 90, 100);
+  // Matraz: corcho, líquido verde, burbujas y contorno de vidrio.
+  g.fillStyle(ink, 1);
+  g.fillRect(94, 18, 12, 7);
+  g.fillStyle(liquid, 0.9);
+  g.fillTriangle(89, 54, 111, 54, 100, 40);
+  g.fillStyle(glass, 0.5);
+  g.fillCircle(97, 48, 3);
+  g.fillCircle(104, 44, 2);
+  g.lineStyle(3, glass, 0.85);
+  g.beginPath();
+  g.moveTo(95, 25);
+  g.lineTo(95, 38);
+  g.lineTo(87, 56);
+  g.lineTo(113, 56);
+  g.lineTo(105, 38);
+  g.lineTo(105, 25);
+  g.strokePath();
+  // Mano sobre la base del matraz.
+  g.fillStyle(dark, 1);
+  g.fillCircle(100, 62, 7);
+
+  // Cuello y cabeza (silueta), después el sombrero de copa con cinta.
+  g.fillStyle(dark, 1);
+  g.fillRect(58, 70, 12, 8);
+  g.fillCircle(64, 58, 14);
+  g.fillRect(46, 8, 36, 34); // copa
+  g.fillRect(38, 40, 52, 7); // ala
+  g.fillStyle(ink, 1);
+  g.fillRect(46, 30, 36, 6); // cinta
+
+  // Piernas y zapatos.
+  g.fillStyle(dark, 1);
+  g.fillRect(50, 192, 11, 24);
+  g.fillRect(67, 192, 11, 24);
+  g.fillRect(44, 214, 19, 8);
+  g.fillRect(65, 214, 19, 8);
+}
+
+/**
+ * Mr. Hyde (intro, acto 1): la versión BESTIA — jorobado y encorvado, cabello
+ * salvaje a púas, brazos larguísimos que llegan al suelo con garras, abrigo
+ * harapiento con faldones rotos y pies descalzos grandes. Silueta inquietante
+ * pero SIN sangre ni heridas (público 10+): la amenaza la cuentan la postura
+ * y dos acentos «resabio de la poción» — el ojo verde brillante y un aura
+ * púrpura tenue. Determinista.
+ */
+function drawHyde(g: Phaser.GameObjects.Graphics): void {
+  const dark = hexToNumber(buildings); // silueta completa
+  const eye = hexToNumber(labGreen); // ojo brillante
+  const aura = hexToNumber(potionPurple); // resabio de la poción
+
+  // Aura púrpura tenue + volutas que se desprenden (la poción se le escapa).
+  g.fillStyle(aura, 0.1);
+  g.fillCircle(64, 118, 62);
+  g.fillStyle(aura, 0.16);
+  g.fillCircle(40, 64, 10);
+  g.fillCircle(78, 52, 8);
+  g.fillCircle(58, 38, 6);
+
+  // Cuerpo jorobado: chepa redonda + masa inferior + cuello hacia la cabeza.
+  g.fillStyle(dark, 1);
+  g.fillCircle(64, 120, 46);
+  g.fillRect(34, 130, 66, 48);
+  g.fillTriangle(78, 104, 104, 86, 108, 134);
+
+  // Cabeza baja y prognata.
+  g.fillCircle(102, 92, 17);
+  g.fillCircle(108, 100, 9);
+
+  // Cabello salvaje: púas y mechones alrededor de la cabeza.
+  g.fillTriangle(84, 80, 90, 56, 98, 78);
+  g.fillTriangle(94, 74, 104, 50, 112, 76);
+  g.fillTriangle(108, 80, 120, 62, 120, 86);
+  g.fillCircle(88, 74, 8);
+  g.fillCircle(102, 66, 8);
+
+  // El ojo verde (punto focal, doble halo como los faroles de la niña).
+  g.fillStyle(eye, 0.22);
+  g.fillCircle(106, 88, 8);
+  g.fillStyle(eye, 1);
+  g.fillCircle(106, 88, 3);
+
+  // Abrigo harapiento: faldones rotos colgando a distinta altura.
+  g.fillTriangle(30, 152, 20, 198, 46, 180);
+  g.fillTriangle(46, 170, 54, 206, 70, 182);
+  g.fillTriangle(70, 178, 82, 200, 94, 176);
+  g.fillTriangle(94, 168, 102, 190, 108, 156);
+
+  // Piernas cortas y pies descalzos grandes.
+  g.fillRect(48, 176, 13, 34);
+  g.fillRect(74, 174, 13, 36);
+  g.fillRect(40, 208, 22, 9);
+  g.fillRect(74, 210, 22, 9);
+
+  // Brazo trasero (corto a la vista) con dos garras.
+  g.fillTriangle(40, 118, 26, 178, 46, 182);
+  g.fillTriangle(22, 178, 16, 196, 28, 184);
+  g.fillTriangle(26, 182, 24, 200, 34, 186);
+
+  // Brazo delantero LARGO llegando al suelo + mano y tres garras.
+  g.fillTriangle(84, 116, 126, 172, 92, 134);
+  g.fillTriangle(92, 134, 126, 172, 110, 148);
+  g.fillCircle(124, 172, 8);
+  g.fillTriangle(122, 164, 140, 176, 126, 178);
+  g.fillTriangle(126, 176, 134, 192, 120, 182);
+  g.fillTriangle(118, 180, 122, 198, 112, 184);
+}
+
 /**
  * Registro de texturas: primera hornada (PLAN Etapa 1) + iconos de la
  * Etapa 2 («Cómo jugar» y toggle de mute) + fondo «lab» de la Etapa 3 +
- * la niña de la Etapa 4 + el sello de cera de la Etapa 6. Hornadas futuras
- * (Hyde…) se añaden aquí o en registros posteriores.
+ * la niña de la Etapa 4 + el sello de cera de la Etapa 6 + los dos personajes
+ * de la intro (Jekyll/Hyde, cinemática pre-nivel). Hornadas futuras se añaden
+ * AQUÍ AL FINAL (hay tests que hacen slicing por índice del registro).
  */
 export const TEXTURE_DEFS: readonly TextureDef[] = [
   {
@@ -572,6 +729,22 @@ export const TEXTURE_DEFS: readonly TextureDef[] = [
     height: 128,
     description: 'Sello de cera púrpura del diploma de victoria (borde irregular y brillo).',
     draw: drawWaxSeal,
+  },
+  {
+    key: TEXTURE_KEYS.jekyll,
+    width: 128,
+    height: 224,
+    description:
+      'El Dr. Jekyll: doctor recto con bata clara y copa, matraz de fórmula en alto (intro).',
+    draw: drawJekyll,
+  },
+  {
+    key: TEXTURE_KEYS.hyde,
+    width: 144,
+    height: 240,
+    description:
+      'Mr. Hyde: silueta jorobada y bestia con garras, ojo verde y aura púrpura (intro).',
+    draw: drawHyde,
   },
 ];
 

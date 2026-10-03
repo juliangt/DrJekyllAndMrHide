@@ -3,7 +3,7 @@
 > **Tipo de documento:** Especificación funcional y técnica (fuente de verdad del proyecto).
 > **Documento origen del pedido:** [`start.md`](../start.md)
 > **Plan de desarrollo asociado:** [`docs/PLAN.md`](./PLAN.md)
-> **Versión:** 1.0 · **Fecha:** 2026-10-02
+> **Versión:** 1.1 · **Fecha:** 2026-10-03
 
 ---
 
@@ -51,6 +51,7 @@ Decisiones cerradas con el solicitante (y diferencias respecto al pedido origina
 | D8 | Arte | **100 % procedural** (texturas generadas en código con Phaser Graphics) | Cero archivos de imagen, cero licencias de assets. |
 | D9 | Audio | **Web Audio API sintetizado** (osciladores) + toggle mute persistente | Coincide con la opción de `start.md`. |
 | D10 | Formato de docs | Markdown en el repo | — |
+| D11 | Cinemática de introducción | **INTRO pre-nivel**: al salir de `MENU` («Comenzar» o «Continuar») se reproduce una cinemática animada — Jekyll bebe la fórmula, se transforma en Hyde y Hyde acecha a la niña sin tocarla (D4) — antes de la narrativa; «Saltar» disponible | Pedido directo del solicitante tras la Etapa 7 (no está en `start.md`); el quiz fallido NO la reproduce (D5 intacto). |
 
 ---
 
@@ -59,12 +60,12 @@ Decisiones cerradas con el solicitante (y diferencias respecto al pedido origina
 Máquina de estados (herencia conceptual de `start.md`) **mapeada 1:1 a escenas Phaser**:
 
 ```
-BOOT ──► PRELOAD ──► MENU ──► NARRATIVE ──► ACTION ──► QUIZ ──► VICTORY
-                       ▲          │            │            │
-                       │          │            │            ├─ ✔ correcta → VICTORY
-                       │          │            │            └─ ✘ incorrecta → reinicio de NIVEL
-                       │          │            └── timeout ──► GAME_OVER ──► reintentar ACTION
-                       │          └── "Continuar" (si hay save)
+BOOT ──► PRELOAD ──► MENU ──► INTRO ──► NARRATIVE ──► ACTION ──► QUIZ ──► VICTORY
+                       ▲        │           │            │            │
+                       │        │           │            │            ├─ ✔ correcta → VICTORY
+                       │        │           │            │            └─ ✘ incorrecta → reinicio de NIVEL
+                       │        │           │          └── timeout ──► GAME_OVER ──► reintentar ACTION
+                       │        └── «Comenzar» y «Continuar» entran aquí (v1); «Saltar» la omite
                        └───────────────── reinicio de nivel (D5) ─────────────────┘
 ```
 
@@ -72,7 +73,8 @@ BOOT ──► PRELOAD ──► MENU ──► NARRATIVE ──► ACTION ─�
 |---|---|---|
 | `BOOT` | Init: genera texturas procedurales, crea sistemas (save/audio/score). | → `PRELOAD` |
 | `PRELOAD` | Carga tipografías web (Google Fonts) con pantalla mínima. | → `MENU` |
-| `MENU` | Splash gótico: título, «Comenzar el viaje», «Cómo jugar», «Continuar» si hay save. | → `NARRATIVE` |
+| `MENU` | Splash gótico: título, «Comenzar el viaje», «Cómo jugar», «Continuar» si hay save. | → `INTRO` (también «Continuar», v1) |
+| `INTRO` | Cinemática de introducción (§4.1): Jekyll bebe la fórmula y se transforma en Hyde; Hyde acecha a la niña en el callejón (el golpe nunca cae, D4). Avance por tap. | fin o «Saltar» → `NARRATIVE` (N1) |
 | `NARRATIVE` | Viñeta del nivel (paneles de texto + arte de fondo), avance por tap. | → `ACTION` |
 | `ACTION` | Minijuego arcade del nivel (§4.2). | meta → `QUIZ` · timeout → `GAME_OVER` |
 | `GAME_OVER` | Overlay animoso: «La niebla lo ocultó todo… ¡inténtalo de nuevo!». **No es fin de partida.** | → reintentar `ACTION` (mismo nivel) |
@@ -81,7 +83,7 @@ BOOT ──► PRELOAD ──► MENU ──► NARRATIVE ──► ACTION ─�
 
 **Regla de reinicio de nivel (D5):** al fallar el quiz se muestra el feedback pedagógico, se
 **descartan los puntos ganados en esa tanda del nivel** y el flujo vuelve a `NARRATIVE`
-(con avance rápido/skip disponible para no frustrar).
+(sin reproducir la cinemática de introducción, con avance rápido/skip disponible para no frustrar).
 
 ---
 
@@ -101,6 +103,12 @@ Dr. Jekyll.
 2. *En su laboratorio, el Dr. Jekyll mezcla polvos púrpuras. Bebe. Y deja de ser él.*
 3. *Mr. Hyde camina por el callejón. Una niña con farol aparece en la esquina…*
 4. *«Es hora del susto», susurra Hyde. **Tócala 3 veces antes de que la niebla lo cubra todo.***
+
+**Cinemática de introducción (pre-viñeta, `INTRO` en §3):** estos mismos hechos se representan
+además como una cinemática animada que corre antes de la primera viñeta del nivel: Jekyll bebe
+la fórmula y se transforma en Hyde, y Hyde —ya transformado— acecha a la niña y alza el brazo
+sin que el golpe caiga (D4), con el cierre «Y tú eres Mr. Hyde» para que se entienda que quien
+juega es Hyde. Avanza por tap, se omite con «Saltar» y su texto retoma las viñetas de arriba.
 
 ### 4.2 Mecánica de acción
 
@@ -177,6 +185,7 @@ Redacción definitiva a pulir en implementación.
 |---|---|---|
 | **Splash / Menu** | Título gótico animado (niebla), subtítulo «Una aventura por el libro de R. L. Stevenson», botones «Comenzar el viaje», «Cómo jugar», «Continuar» (solo si hay partida en curso) | Botón primario ≥ 64 px de alto; título con fade-in |
 | **Cómo jugar** | 3 ilustraciones/iconos procedurales: 1) lee la viñeta, 2) toca al objetivo, 3) responde el quiz | Cerrable; accesible desde Menu |
+| **Intro (cinemática)** | Acto 1 — laboratorio: Jekyll bebe la fórmula y se transforma en Hyde (flash, sacudida, crossfade). Acto 2 — callejón: Hyde acecha a la niña y alza el brazo; letreros por beat | Tap avanza; botón «Saltar» ≥ 64 px; el golpe nunca cae (D4) |
 | **Narrativa** | Paneles de texto sobre fondo del callejón/laboratorio, avance por tap, botón «Saltar» | Texto máx. ~40 palabras por panel; tipografía serif legible |
 | **Acción (N1)** | HUD superior: contador «Sustos causados: X/3», timer (barra + segundos), puntaje; botón pausa (vuelve a Menu guardando progreso de nivel) | Timer en rojo y con *tick* en los últimos 5 s |
 | **Quiz** | Modal centrado tipo pergamino/cartas antiguas: pregunta, 4 opciones (A–D) como tarjetas, feedback inline | Opciones ≥ 56 px de alto; nunca se cierra sin feedback |
@@ -210,8 +219,9 @@ Sin archivos de imagen: todas las texturas se generan en código (`Phaser.GameOb
 - **Callejón (parallax 3 capas):** siluetas de edificios generadas con rectángulos irregulares;
   capas de niebla = sprites grandes de gradiente radial difuso con deriva sinusoidal y opacidad
   baja; farolas = silueta + halo con variación aleatoria de opacidad (parpadeo).
-- **Personajes:** siluetas vectoriales reconocibles — Hyde (sombrero de copa, gabán, alto y
-  delgado) y la niña (silueta pequeña con farol iluminado, su punto focal visual).
+- **Personajes:** siluetas vectoriales reconocibles — el Dr. Jekyll (bata clara, copa y matraz
+  con la fórmula; cinemática de intro), Hyde (jorobado, con garras, ojo verde y aura púrpura)
+  y la niña (silueta pequeña con farol iluminado, su punto focal visual).
 - **Estados de acierto:** flash blanco breve, «!» flotante, micro-shake de cámara (≤ 150 ms, suave).
 - **UI gótica:** marcos tipo pergamino (rectángulos redondeados + borde doble sepia); botones con
   estados hover/active (desktop) y pressed (táctil).
@@ -286,6 +296,7 @@ src/
 ├── config/
 │   ├── palette.ts              # colores (§7.1)
 │   ├── game.config.ts          # Phaser config (scale FIT, scenes)
+│   ├── intro.ts                # datos de la cinemática de introducción (beats, captions, timings)
 │   └── levels/
 │       ├── types.ts            # LevelConfig, ActionConfig, QuizConfig, LorePanel
 │       ├── level1.ts           # TODO el contenido del Nivel 1 como DATOS
@@ -294,6 +305,7 @@ src/
 │   ├── BootScene.ts            # genera texturas procedurales + init sistemas
 │   ├── PreloadScene.ts         # fuentes web + splash mínimo
 │   ├── MenuScene.ts
+│   ├── IntroScene.ts           # cinemática de introducción: Jekyll → Hyde (§4.1)
 │   ├── NarrativeScene.ts       # genérica: renderiza el lore del LevelConfig
 │   ├── ActionScene.ts          # genérica: ejecuta el ActionConfig del nivel
 │   ├── QuizScene.ts            # genérica: renderiza el QuizConfig
@@ -368,7 +380,8 @@ interface SaveData {
 ```
 
 - Se guarda al: comenzar nivel, completar quiz correcto, terminar partida, toggle de mute.
-- «Continuar» en Menu visible solo si `inProgress === true` (v1: reaparece en la narrativa del N1).
+- «Continuar» en Menu visible solo si `inProgress === true` (v1: reanuda por la cinemática de
+  introducción hasta la narrativa del N1).
 - Al completar `VICTORY`, el save conserva `lastScore` como récord; «Jugar de nuevo» resetea la tanda.
 - Save corrupto o ausente ⇒ arranque limpio sin errores (try/catch + valores por defecto).
 

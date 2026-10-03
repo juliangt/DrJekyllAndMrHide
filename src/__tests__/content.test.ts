@@ -44,6 +44,7 @@ import {
 } from '../gameplay/victory';
 import { NARRATIVE_SKIP_BUTTON } from '../config/narrative';
 import { ACTION_PAUSE_BUTTON } from '../gameplay/actionLayout';
+import { INTRO_BEATS } from '../config/intro';
 
 // ---- Corpus de TODOS los textos del juego ------------------------------------
 
@@ -135,6 +136,13 @@ function buildCorpus(): readonly { where: string; text: string }[] {
 
   corpus.push({ where: 'narrativa: botón «Saltar»', text: NARRATIVE_SKIP_BUTTON.label });
   corpus.push({ where: 'acción: botón «Pausa»', text: ACTION_PAUSE_BUTTON.label });
+
+  // Cinemática de introducción: los letreros visibles de cada beat.
+  INTRO_BEATS.forEach((beat, index) => {
+    if (beat.caption.length > 0) {
+      corpus.push({ where: `intro: letrero del beat ${index + 1}`, text: beat.caption });
+    }
+  });
 
   corpus.push({ where: 'victoria: titular', text: VICTORY_LABELS.heading });
   corpus.push({ where: 'victoria: botón «Jugar de nuevo»', text: VICTORY_LABELS.playAgain });

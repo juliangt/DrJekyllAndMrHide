@@ -45,7 +45,7 @@ el minijuego) se mide con el contador de FPS integrado:
 
 1. Abre el juego en el dispositivo (o devtools → device emulation) y añade
    **`?debug`** a la URL, p. ej. `http://localhost:5173/?debug`.
-2. Juega el minijuego de acción (Menu → Narrativa → Acción). Aparece un contador
+2. Juega el minijuego de acción (Menu → Intro → Narrativa → Acción). Aparece un contador
    «N FPS» en la esquina inferior izquierda, actualizado 2 veces por segundo con
    los FPS reales del loop de Phaser.
 3. Sin `?debug` el contador no existe (costo cero): la medición no afecta al juego.
@@ -56,7 +56,7 @@ Con el contador visible, completa el ítem de FPS de
 ## QA manual pendiente (dispositivo real)
 
 La Etapa 7 automatizó todo lo automatizable (responsive 320→1920, persistencia,
-accesibilidad, revisión de textos y Definition of Done ejecutable — 832 tests).
+accesibilidad, revisión de textos y Definition of Done ejecutable — 1039 tests).
 Lo que **exige hardware** queda en [`docs/QA-CHECKLIST.md`](docs/QA-CHECKLIST.md):
 FPS en gama media real, multi-touch (60 taps rápidos), hitboxes con dedos,
 teclado virtual, audio en iOS/Safari (políticas de autoplay), zoom y

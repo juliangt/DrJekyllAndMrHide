@@ -3,8 +3,8 @@
  * (mobile-first vertical), `Scale.FIT` + `CENTER_BOTH` y fondo de noche de
  * la paleta. `src/main.ts` consume esta config (nada de config inline).
  *
- * Escenas registradas (SPEC §3 / §10.2): las 7 del flujo con archivo propio,
- * EN ORDEN de arranque. La 8ª clave del flujo, `SceneKey.GAME_OVER`, NO se
+ * Escenas registradas (SPEC §3 / §10.2): las 8 del flujo con archivo propio,
+ * EN ORDEN de arranque. La 9ª clave del flujo, `SceneKey.GAME_OVER`, NO se
  * registra aquí porque es un overlay dentro de `ActionScene` (ver
  * `sceneKeys.ts`).
  *
@@ -16,6 +16,7 @@ import { BASE_HEIGHT, BASE_WIDTH } from './dimensions';
 import { nightBackground } from './palette';
 import { ActionScene } from '../scenes/ActionScene';
 import { BootScene } from '../scenes/BootScene';
+import { IntroScene } from '../scenes/IntroScene';
 import { MenuScene } from '../scenes/MenuScene';
 import { NarrativeScene } from '../scenes/NarrativeScene';
 import { PreloadScene } from '../scenes/PreloadScene';
@@ -32,6 +33,7 @@ export const SCENES: Phaser.Types.Scenes.SceneType[] = [
   BootScene, // SceneKey.BOOT
   PreloadScene, // SceneKey.PRELOAD
   MenuScene, // SceneKey.MENU
+  IntroScene, // SceneKey.INTRO (cinemática pre-nivel: Jekyll → Hyde)
   NarrativeScene, // SceneKey.NARRATIVE
   ActionScene, // SceneKey.ACTION (contiene el overlay GAME_OVER)
   QuizScene, // SceneKey.QUIZ

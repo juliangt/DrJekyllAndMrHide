@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 const projectRoot = process.cwd();
 
-/** Archivos esperados bajo src/ según SPEC §10.2 (más dimensions.ts, añadido en Etapa 0). */
+/** Archivos esperados bajo src/ según SPEC §10.2 (más dimensions.ts, añadido en Etapa 0; más intro.ts e IntroScene.ts, añadidos en la cinemática pre-nivel). */
 const EXPECTED_FILES: string[] = [
   // bootstrap
   'src/main.ts',
@@ -17,6 +17,7 @@ const EXPECTED_FILES: string[] = [
   'src/config/dimensions.ts',
   'src/config/palette.ts',
   'src/config/game.config.ts',
+  'src/config/intro.ts',
   'src/config/levels/types.ts',
   'src/config/levels/level1.ts',
   'src/config/levels/index.ts',
@@ -24,6 +25,7 @@ const EXPECTED_FILES: string[] = [
   'src/scenes/BootScene.ts',
   'src/scenes/PreloadScene.ts',
   'src/scenes/MenuScene.ts',
+  'src/scenes/IntroScene.ts',
   'src/scenes/NarrativeScene.ts',
   'src/scenes/ActionScene.ts',
   'src/scenes/QuizScene.ts',
@@ -42,8 +44,8 @@ const EXPECTED_FILES: string[] = [
 ];
 
 describe('estructura de carpetas (SPEC §10.2)', () => {
-  it('declara los 22 archivos esperados', () => {
-    expect(EXPECTED_FILES.length).toBe(22);
+  it('declara los 24 archivos esperados', () => {
+    expect(EXPECTED_FILES.length).toBe(24);
   });
 
   it.each(EXPECTED_FILES)('existe %s', (relativePath) => {
