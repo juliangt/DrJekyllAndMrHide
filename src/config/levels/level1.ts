@@ -36,7 +36,9 @@ export const level1: LevelConfig = {
       background: 'alley',
     },
     {
-      text: '«Es hora del susto», susurra Hyde. Tócala 3 veces antes de que la niebla lo cubra todo.',
+      // La instrucción de juego va entre **negritas** (así la marca SPEC §4.1):
+      // `parseLoreSegments` la convierte en el tramo enfatizado del panel.
+      text: '«Es hora del susto», susurra Hyde. **Tócala 3 veces antes de que la niebla lo cubra todo.**',
       background: 'alley',
     },
   ],

@@ -56,8 +56,8 @@ function makeRecordingGraphics(): { g: Parameters<TextureDef['draw']>[0]; calls:
 const PALETTE_NUMBERS = new Set<number>(Object.values(PALETTE).map((hex) => hexToNumber(hex)));
 
 describe('TEXTURE_DEFS — invariants del registro', () => {
-  it('tiene las 10 texturas (hornadas 1 + 2)', () => {
-    expect(TEXTURE_DEFS.length).toBe(10);
+  it('tiene las 12 texturas (hornadas 1 + 2 + 3)', () => {
+    expect(TEXTURE_DEFS.length).toBe(12);
   });
 
   it('claves únicas', () => {
@@ -102,7 +102,7 @@ describe('TEXTURE_DEFS — invariants del registro', () => {
 
   it('la 2ª hornada (Etapa 2): iconos del «Cómo jugar» y altavoces', () => {
     const keys = TEXTURE_DEFS.map((def) => def.key);
-    expect(keys.slice(5)).toEqual([
+    expect(keys.slice(5, 10)).toEqual([
       TEXTURE_KEYS.iconBook,
       TEXTURE_KEYS.iconTap,
       TEXTURE_KEYS.iconQuestion,
@@ -114,6 +114,13 @@ describe('TEXTURE_DEFS — invariants del registro', () => {
     expect(TEXTURE_KEYS.iconQuestion).toBe('icon-question');
     expect(TEXTURE_KEYS.speakerOn).toBe('speaker-on');
     expect(TEXTURE_KEYS.speakerOff).toBe('speaker-off');
+  });
+
+  it('la 3ª hornada (Etapa 3): mesa y frasco del laboratorio narrativo', () => {
+    const keys = TEXTURE_DEFS.map((def) => def.key);
+    expect(keys.slice(10)).toEqual([TEXTURE_KEYS.labBench, TEXTURE_KEYS.labFlask]);
+    expect(TEXTURE_KEYS.labBench).toBe('lab-bench');
+    expect(TEXTURE_KEYS.labFlask).toBe('lab-flask');
   });
 });
 
@@ -257,6 +264,36 @@ describe('TEXTURE_DEFS — dibujos con Graphics de grabación', () => {
     expect(
       recOff.calls.some(
         (c) => c.method === 'lineStyle' && c.args[1] === hexToNumber(PALETTE.error),
+      ),
+    ).toBe(true);
+  });
+
+  it('la mesa del laboratorio: tablero + patas (fillRect) y reflejo de farola', () => {
+    const def = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.labBench);
+    expect(def).toBeDefined();
+    const { g, calls } = makeRecordingGraphics();
+    def?.draw(g);
+    expect(calls.filter((c) => c.method === 'fillRect').length).toBeGreaterThanOrEqual(5);
+    // El reflejo tenue del tablero usa el fuego de farola de la paleta.
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.lampFire),
+      ),
+    ).toBe(true);
+  });
+
+  it('el frasco: halo de brillo (círculos), líquido (triángulo) y vidrio (strokePath)', () => {
+    const def = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.labFlask);
+    expect(def).toBeDefined();
+    const { g, calls } = makeRecordingGraphics();
+    def?.draw(g);
+    expect(calls.filter((c) => c.method === 'fillCircle').length).toBeGreaterThanOrEqual(3);
+    expect(calls.some((c) => c.method === 'fillTriangle')).toBe(true);
+    expect(calls.some((c) => c.method === 'strokePath')).toBe(true);
+    // El líquido/base es NEUTRO (pergamino claro): el tinte del prop lo colorea.
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.parchmentLight),
       ),
     ).toBe(true);
   });
