@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 
 const projectRoot = process.cwd();
 
-/** Archivos esperados bajo src/ según SPEC §10.2 (más dimensions.ts, añadido en Etapa 0; más intro.ts e IntroScene.ts, añadidos en la cinemática pre-nivel). */
+/** Archivos esperados bajo src/ según SPEC §10.2 (más dimensions.ts, añadido en Etapa 0; más intro.ts e IntroScene.ts, añadidos en la cinemática pre-nivel; más level2.ts y level3.ts, añadidos en Fase 1 del multi-nivel). */
 const EXPECTED_FILES: string[] = [
   // bootstrap
   'src/main.ts',
@@ -20,6 +20,8 @@ const EXPECTED_FILES: string[] = [
   'src/config/intro.ts',
   'src/config/levels/types.ts',
   'src/config/levels/level1.ts',
+  'src/config/levels/level2.ts',
+  'src/config/levels/level3.ts',
   'src/config/levels/index.ts',
   // scenes (las del flujo de estados, SPEC §3)
   'src/scenes/BootScene.ts',
@@ -44,8 +46,8 @@ const EXPECTED_FILES: string[] = [
 ];
 
 describe('estructura de carpetas (SPEC §10.2)', () => {
-  it('declara los 24 archivos esperados', () => {
-    expect(EXPECTED_FILES.length).toBe(24);
+  it('declara los 26 archivos esperados', () => {
+    expect(EXPECTED_FILES.length).toBe(26);
   });
 
   it.each(EXPECTED_FILES)('existe %s', (relativePath) => {

@@ -3,21 +3,27 @@
  * reencuadre D4): recorre TODOS los textos del juego y verifica que son aptos
  * para público 10+.
  *
- * GLOSA DE REVISIÓN (adulto/educador — revisión aplicada en Etapa 7):
- *  - LÉXICO VIOLENTO: sin ocurrencias. El reencuadre D4 convierte el
- *    episodio del libro en «sustos en la niebla»: la niña sale «asustada
- *    pero ilesa», nadie sufre daño visible y no aparece ninguna palabra de
- *    la lista prohibida (sangre, muerte, matar, asesinar, atropello,
- *    pisotea, cadáver, arma, …) en ninguno de los textos del juego.
+ * GLOSA DE REVISIÓN (adulto/educador — revisión aplicada en Etapa 7, ampliada
+ * en Fase 1 con los niveles 2 y 3):
+ *  - LÉXICO VIOLENTO: la raíz «golpe» SALIÓ de la lista con las mecánicas de
+ *    N2/N3 (cane-strike / transform-target): «golpe/bastonazo» es ahora un
+ *    verbo de JUEGO caricaturesco — nadie sufre daño visible y el objetivo
+ *    escapa o se transforma entre la niebla (mismo reencuadre D4). El resto
+ *    del campo semántico violento (sangre, muerte, matar, asesinar,
+ *    atropello, pisotea, cadáver, arma, …) sigue PROHIBIDO en todos los
+ *    textos del juego.
  *  - TÉRMINOS REVISADOS Y PERMITIDOS (con razón): «ir preso» (pregunta del
- *    quiz, VERBATIM de start.md/SPEC §4.3 — habla de justicia, no de
- *    violencia), «Soborna» (opción C: soborno económico, no violento) y
- *    «testigos… un cheque que lo señala» (feedback D: intriga literaria).
+ *    quiz N1, VERBATIM de start.md/SPEC §4.3 — habla de justicia, no de
+ *    violencia), «Soborna» (opción C: soborno económico, no violento),
+ *    «testigos… un cheque que lo señala» (feedback D: intriga literaria) y
+ *    «¿Por qué Hyde mató…?» (pregunta del quiz N2, VERBATIM del material
+ *    fuente: el feedback didáctico sí explica el episodio sin morbo).
  *  - TONO: gótico «lúgubre pero amable» (SPEC §1); el GAME_OVER anima a
  *    reintentar y JAMÁS dice «perdiste» (SPEC §6). Mayúsculas sostenidas:
  *    solo signos de exclamación naturales del español.
- *  - «ILESA» presente donde corresponde (SPEC §4.2/§4.4: la niña queda
- *    «asustada pero ilesa» en el fragmento de historia).
+ *  - «ILESA» presente donde corresponde (SPEC §4.2/§4.4: la niña del N1
+ *    queda «asustada pero ilesa» en su fragmento de historia; los fragmentos
+ *    de N2/N3 narran sus episodios con el mismo espíritu D4).
  *
  * Cualquier texto nuevo debe pasar por este test: el corpus se construye
  * desde los CONFIGS (fuente de verdad), no copiado a mano.
@@ -67,14 +73,20 @@ function normalize(text: string): string {
  * palabra: 'sangr' captura sangre/sangriento, 'mata' captura matar/matanza).
  * Es la lista del PLAN (sangre, muerte, matar, asesinar, atropello,
  * pisotea, cadáver, arma…) ampliada con el resto del campo semántico.
+ *
+ * NOTA FASE 1 (niveles 2 y 3): la raíz «golpe» SALE de la lista — con las
+ * mecánicas cane-strike / transform-target, «golpe/bastonazo» es un verbo de
+ * juego caricaturesco (nadie sufre daño visible, D4) y aparece en textos
+ * legítimos como «Golpéalo 5 veces» o el HUD «Golpes a Hyde». El resto del
+ * campo semántico violento sigue prohibido en TODOS los textos.
  */
 const FORBIDDEN_STEMS: readonly string[] = [
   // sangre y heridas
   'sangr', 'herid', 'moreton', 'cardenal',
   // muerte
   'muert', 'morir', 'muri', 'muere', 'fallec', 'cadaver', 'restos',
-  // matar / agredir
-  'mata', 'asesin', 'homicid', 'golpe', 'aplast', 'destroz', 'machac',
+  // matar / agredir («golpe» retirado en Fase 1: verbo de juego de N2/N3)
+  'mata', 'asesin', 'homicid', 'aplast', 'destroz', 'machac',
   'atropell', 'pisote', 'estrangul', 'ahog', 'tortur', 'flagel',
   // armas
   'arma', 'pistola', 'revolver', 'escopeta', 'rifle', 'cuchill', 'navaja',
@@ -103,6 +115,13 @@ function buildCorpus(): readonly { where: string; text: string }[] {
       corpus.push({ where: `nivel ${level.id}: viñeta ${index + 1}`, text: stripLoreMarkers(panel.text) });
     });
     corpus.push({ where: `nivel ${level.id}: HUD (etiqueta de meta)`, text: level.action.hudLabel });
+    // Textos propios de mecánicas concretas (unión discriminada por `mechanic`).
+    if (level.action.mechanic === 'cane-strike') {
+      corpus.push({
+        where: `nivel ${level.id}: grito de victoria de Hyde (cane-strike)`,
+        text: level.action.victoryLine,
+      });
+    }
     corpus.push({ where: `nivel ${level.id}: pregunta del quiz`, text: level.quiz.question });
     level.quiz.options.forEach((option, index) => {
       corpus.push({ where: `nivel ${level.id}: opción ${String.fromCharCode(65 + index)}`, text: option.text });
@@ -237,18 +256,28 @@ describe('contenido 2 — tono 10+ (sin mayúsculas agresivas, feedback pedagóg
 
 // ---- 3. «Ilesa» donde corresponde (D4) ------------------------------------------
 
-describe('contenido 3 — la niña queda «asustada pero ilesa» (reencuadre D4)', () => {
-  it('el fragmento de historia del Nivel 1 contiene «ilesa» y «asustada»', () => {
-    for (const level of LEVELS) {
-      const fragment = normalize(level.quiz.storyFragment);
-      expect(fragment, `fragmento del nivel ${level.id}`).toMatch(/ilesa/);
-      expect(fragment).toMatch(/asustada/);
-    }
+describe('contenido 3 — la niña queda «asustada pero ilesa» (reencuadre D4, Nivel 1)', () => {
+  it('el fragmento de historia del NIVEL 1 contiene «ilesa» y «asustada»', () => {
+    const level1 = LEVELS[0];
+    expect(level1.id).toBe(1); // guardia: el episodio de la niña es el del N1
+    const fragment = normalize(level1.quiz.storyFragment);
+    expect(fragment).toMatch(/ilesa/);
+    expect(fragment).toMatch(/asustada/);
   });
 
   it('el reencuadre es EXPLÍCITO: asustada PERO ilesa (la fórmula completa)', () => {
-    const level = LEVELS[0];
-    expect(normalize(level.quiz.storyFragment)).toMatch(/asustada pero ilesa/);
+    const level1 = LEVELS[0];
+    expect(normalize(level1.quiz.storyFragment)).toMatch(/asustada pero ilesa/);
+  });
+
+  it('los fragmentos de los NIVELES 2 y 3 narran sus episodios con el mismo espíritu D4', () => {
+    for (const level of LEVELS.filter((level) => level.id !== 1)) {
+      const fragment = normalize(level.quiz.storyFragment);
+      expect(fragment.trim().length, `fragmento del nivel ${level.id} vacío`).toBeGreaterThan(0);
+      expect(fragment, `fragmento del nivel ${level.id} con léxico prohibido`).not.toMatch(
+        /sangre|herid|muert|mata|asesin|atropell|pisote/,
+      );
+    }
   });
 });
 
@@ -275,18 +304,20 @@ describe('contenido 4 — la pregunta y opciones del Nivel 1 son VERBATIM (start
     }
   });
 
-  it('el tablero del quiz compone sus TRES vistas con los textos reales sin desbordar', () => {
-    // Duplicado a propósito de la revisión: los textos REALES pasan por el
-    // compositor puro (garantía «nunca desborda» del quiz).
-    const correctIndex = level1.quiz.options.findIndex((option) => option.correct === true);
-    const board = quizBoardLayout({
-      question: level1.quiz.question,
-      optionTexts: level1.quiz.options.map((option) => option.text),
-      wrongFeedbacks: level1.quiz.options.filter((_, index) => index !== correctIndex).map((option) => option.feedback),
-      correctFeedback: level1.quiz.options[correctIndex]!.feedback,
-      storyFragment: level1.quiz.storyFragment,
-    });
-    expect(board.fits).toBe(true);
-    expect(initialQuizState({ optionCount: level1.quiz.options.length, correctIndex }).optionCount).toBe(4);
+  it('el tablero del quiz compone sus TRES vistas con los textos reales de TODOS los niveles sin desbordar', () => {
+    // Duplicado a propósito de la revisión: los textos REALES de cada nivel
+    // pasan por el compositor puro (garantía «nunca desborda» del quiz).
+    for (const level of LEVELS) {
+      const correctIndex = level.quiz.options.findIndex((option) => option.correct === true);
+      const board = quizBoardLayout({
+        question: level.quiz.question,
+        optionTexts: level.quiz.options.map((option) => option.text),
+        wrongFeedbacks: level.quiz.options.filter((_, index) => index !== correctIndex).map((option) => option.feedback),
+        correctFeedback: level.quiz.options[correctIndex]!.feedback,
+        storyFragment: level.quiz.storyFragment,
+      });
+      expect(board.fits, `el nivel ${level.id} desborda el tablero del quiz`).toBe(true);
+      expect(initialQuizState({ optionCount: level.quiz.options.length, correctIndex }).optionCount).toBe(4);
+    }
   });
 });

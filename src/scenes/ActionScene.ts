@@ -1,6 +1,7 @@
 /**
  * ACTION (SPEC §3, §4.2 / PLAN Etapa 4 — etapa crítica): escena GENÉRICA
- * que ejecuta el `ActionConfig` del nivel activo (v1: `tap-target`).
+ * que ejecuta el `ActionConfig` del nivel activo (v1: `tap-target`; las
+ * mecánicas 'cane-strike' y 'transform-target' de N2/N3 llegan en Fase 2).
  *
  * ARQUITECTURA (el corazón de la etapa): esta escena es una CAPA FINA que
  * consume módulos PUROS testeables — TODO el estado la decide el reducer
@@ -117,7 +118,17 @@ export class ActionScene extends Phaser.Scene {
 
   init(data: ActionSceneData = {}): void {
     this.level = activeLevelFor(data.levelId);
-    this.action = this.level.action; // v1: la unión solo tiene 'tap-target'
+    // Fase 1 (multi-nivel): la unión `ActionConfig` ahora también declara
+    // 'cane-strike' (N2) y 'transform-target' (N3). Esta escena todavía solo
+    // implementa 'tap-target' (las nuevas mecánicas llegan en la Fase 2),
+    // así que estrechamos el discriminante aquí: si el nivel activo pide
+    // otra mecánica, falla de forma explícita y no con sprites ambiguos.
+    if (this.level.action.mechanic !== 'tap-target') {
+      throw new Error(
+        `La mecánica "${this.level.action.mechanic}" aún no está implementada (llega en la Fase 2).`,
+      );
+    }
+    this.action = this.level.action;
     this.state = initialActionState({
       goal: this.action.goal,
       timeLimitSec: this.action.timeLimitSec,
