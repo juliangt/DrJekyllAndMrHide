@@ -394,7 +394,7 @@ Diseño ya existente en `start.md`, listo para implementarse como nuevos `LevelC
 | Nivel | Mecánica nueva (`ActionConfig`) | Quiz |
 |---|---|---|
 | **2 — El Asaltante de la Niebla** (Sir Danvers Carew) | `chase-escape`: el objetivo cruza la pantalla y **escapa** si sale de ella; 5 taps antes del escape; presión por posición, no por timer | Objeto que vincula a Hyde con el crimen (bastón partido) |
-| **3 — El Secreto del Gabinete** | `collect-falling`: 5 frascos de poción caen desde la mesa del laboratorio; tap antes de que desaparezcan; timer | Cómo se revelan los hechos (carta de Lanyon + confesión de Jekyll) |
+| **3 — El Secreto del Gabinete** | `collect-falling`: 5 frascos de poción caen desde la mesa del laboratorio; tap antes de que desaparezcan; timer | Cómo se revelan los hechos (la confesión de Jekyll, hallada en un sobre sellado en el laboratorio — único documento del cómic) |
 
 Otras extensiones contempladas: banco de preguntas por nivel (pool aleatorio), i18n, música de
 ambiente, PWA offline.

@@ -8,9 +8,11 @@
  *   tras cada golpe Hyde se vuelve Jekyll (invulnerable) 3 segundos, así que
  *   solo cuentan los golpes con eltiming correcto. Las texturas 'hyde' y
  *   'jekyll' ya existen (intro).
- * - quiz: pregunta y opciones VERBATIM del material fuente (C es la
- *   correcta), feedback pedagógico por opción, y `storyFragment` adaptando
- *   el episodio de las cartas sobre el escritorio.
+ * - quiz: pregunta y opciones del material fuente (C es la correcta,
+ *   adaptada al cómic: la confesión escrita del propio Jekyll), feedback
+ *   pedagógico por opción, y `storyFragment` adaptando el episodio del
+ *   sobre sellado con la confesión de Jekyll — el ÚNICO documento del cómic
+ *   (pp. 36–37 y 63); no existe carta de Lanyon.
  */
 import type { LevelConfig } from './types';
 
@@ -50,7 +52,8 @@ export const level3: LevelConfig = {
     hudLabel: 'Golpes a Hyde',
   },
 
-  // Quiz literario (pregunta y opciones verbatim del material fuente).
+  // Quiz literario (pregunta y opciones del material fuente; la correcta
+  // adaptada al cómic: la verdad llega por UNA confesión escrita de Jekyll).
   quiz: {
     question: '¿De qué forma el Dr. Jekyll confiesa que él es Hyde?',
     options: [
@@ -62,13 +65,13 @@ export const level3: LevelConfig = {
       {
         text: 'Se lo dice en secreto a Poole y este se lo cuenta a todo el mundo.',
         feedback:
-          'Poole sí sospechó del sirviente enmascarado que se negaba a salir del gabinete, pero la verdad no llegó de palabra: llegó por escrito, al despacho de Utterson.',
+          'Poole sí sospechó del sirviente enmascarado que se negaba a salir del gabinete, pero la verdad no llegó de palabra: llegó escrita, en el sobre sellado que esperaba en el laboratorio.',
       },
       {
-        text: 'Mediante una carta escrita a su amigo Utterson.',
+        text: 'Mediante una confesión escrita por él mismo, hallada en un sobre sellado en el laboratorio.',
         correct: true,
         feedback:
-          '¡Correcto! La confesión final de Jekyll llega sellada al abogado, junto a la carta de Lanyon, y explica todo el tormento: el placer y la culpa de haber sido Hyde.',
+          '¡Correcto! Junto a Hyde y un vial vacío esperaba un sobre sellado con cordón: la confesión completa de Henry Jekyll, que explica todo el tormento del doctor.',
       },
       {
         text: 'Lo cuenta por TikTok.',
@@ -76,11 +79,12 @@ export const level3: LevelConfig = {
           'En 188X no había redes sociales: solo sobres sellados, lacre y tinta. La confesión viajó en papel, no en pantallas.',
       },
     ],
-    // Fragmento post-acierto: las dos cartas sobre el escritorio del doctor.
+    // Fragmento post-acierto: el sobre sellado con la confesión de Jekyll,
+    // el ÚNICO documento del cómic (no hay carta de Lanyon).
     storyFragment:
-      'Cuando la puerta del laboratorio cedió, Poole y Utterson entraron al gabinete y solo encontraron un silencio espeso. ' +
-      'Sobre el escritorio esperaban dos documentos: la carta del doctor Lanyon y una confesión firmada por Henry Jekyll. ' +
-      'En ella, el doctor relataba todo el tormento: cómo la fórmula despertó a Hyde, cómo el placer de ser él lo fue consumiendo y cómo eligió desaparecer para que la historia terminara. ' +
-      'Gracias a esas páginas, el lector conoce la verdad completa: Jekyll y Hyde fueron siempre la misma persona.',
+      'Cuando la puerta del laboratorio cedió, Poole y Utterson entraron y solo encontraron un silencio espeso: Hyde yacía sin vida junto a un vial vacío, y del doctor Jekyll no quedaba rastro. ' +
+      'Sobre la mesa esperaba un único sobre, sellado con cordón, que el inspector Newcomen llevó a Utterson. ' +
+      'Era la confesión completa de Henry Jekyll: cómo la fórmula despertó a Hyde, cómo el placer de ser él lo fue consumiendo y cómo eligió desaparecer, cerrada con un «que Dios me dé fuerza» y su firma. ' +
+      'Gracias a esas páginas, el lector conoce la verdad: Jekyll y Hyde fueron siempre la misma persona.',
   },
 };

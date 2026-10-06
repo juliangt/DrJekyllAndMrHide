@@ -8,7 +8,9 @@
  *   'lanyon' y la del bastón se generan en la Fase 2 (aquí solo la clave).
  * - quiz: pregunta y opciones VERBATIM del material fuente (A es la
  *   correcta), feedback pedagógico por opción, y `storyFragment` adaptando
- *   el episodio de la carta de Lanyon y el bastón roto.
+ *   el episodio del cómic: el asesinato en la calle nevada, el bastón roto
+ *   y la conexión con Jekyll. SIN carta de Lanyon: en el cómic Lanyon muere
+ *   a bastonazos y no deja NINGÚN documento (pp. 22–23 y 56–57).
  */
 import type { LevelConfig } from './types';
 
@@ -81,10 +83,13 @@ export const level2: LevelConfig = {
           'Un saludo torpe no asusta a nadie en la novela: lo que acabó con Lanyon fue el horror de ver la transformación con sus propios ojos.',
       },
     ],
-    // Fragmento post-acierto: la carta de Lanyon, el bastón roto, la conexión.
+    // Fragmento post-acierto: el asesinato sugerido en la nieve, el bastón
+    // roto hallado en la alcantarilla y la conexión con Jekyll (según el
+    // cómic — Lanyon no deja carta alguna; el único documento del juego es
+    // la confesión de Jekyll, que llega en el N3).
     storyFragment:
-      'El bastón de mango blanco quedó roto en dos sobre el empedrado del callejón. ' +
-      'Sacudido por lo que había presenciado, el doctor Lanyon selló una carta para su amigo Utterson: solo podría abrirla cuando la sombra de Jekyll lo alcanzara también a él. ' +
-      'Dentro del sobre dormía una promesa inquietante: la verdad sobre Hyde estaba escrita, y llevaba la firma del respetable doctor Henry Jekyll.',
+      'La nieve caía sobre la calle cuando Hyde descargó su bastón contra el doctor Lanyon, una y otra vez, y lo despidió con la misma burla que su víctima le gastaba a Jekyll: «De parte nuestra». ' +
+      'El bastón quedó roto en dos; la alcantarilla se lo tragó por una noche, pero el amanecer lo devolvió a la luz. ' +
+      'Utterson lo reconoció al instante, y no hizo falta ningún documento: solo un mango partido bastó para unir a Hyde con el respetable doctor Henry Jekyll.',
   },
 };

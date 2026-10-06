@@ -2,9 +2,10 @@
  * Etapa 1 (ampliada) — test de los DATOS de los tres niveles y del registro:
  * tipado contra LevelConfig (compila), paneles ≤ 40 palabras con fondos
  * válidos, parámetros exactos de cada mecánica (N1 tap-target, N2
- * cane-strike, N3 transform-target), quiz con 4 opciones verbatim (B/A/C
- * correctas) y feedback en todas, fragmento de historia con el episodio,
- * getLevel e ids únicos.
+ * cane-strike, N3 transform-target), quiz con 4 opciones del material
+ * fuente (B/A/C correctas; la C del N3 adaptada al cómic: la confesión de
+ * Jekyll) y feedback en todas, fragmento de historia con el episodio,
+ * getLevel e ids únicos, y un guarda de regresión anti-«carta de Lanyon».
  */
 import { describe, expect, it } from 'vitest';
 import { CANE_TEXTURE_KEY, LANYON_TEXTURE_KEY, level2 } from '../config/levels/level2';
@@ -329,7 +330,7 @@ describe('level2 — quiz: pregunta y opciones verbatim (A correcta)', () => {
   });
 });
 
-describe('level2 — storyFragment: el episodio de la carta de Lanyon', () => {
+describe('level2 — storyFragment: el episodio del bastón roto (cómic)', () => {
   const fragment = level2.quiz.storyFragment;
 
   it('no vacío y con 3–5 oraciones (ritmo de lectura)', () => {
@@ -338,11 +339,17 @@ describe('level2 — storyFragment: el episodio de la carta de Lanyon', () => {
     expect(sentenceCount(fragment)).toBeLessThanOrEqual(5);
   });
 
-  it('contiene los tres ingredientes del episodio: bastón roto, carta de Lanyon, conexión con Jekyll', () => {
+  it('contiene los tres ingredientes del episodio: calle nevada, bastón roto, conexión con Jekyll', () => {
+    expect(fragment).toContain('nieve');
     expect(fragment).toContain('bastón');
-    expect(fragment).toContain('Lanyon');
+    expect(fragment).toContain('roto');
     expect(fragment).toContain('Utterson');
     expect(fragment).toContain('Jekyll');
+  });
+
+  it('alineado al cómic: SIN carta de Lanyon (Lanyon muere sin dejar documento)', () => {
+    expect(fragment).not.toMatch(/carta/i);
+    expect(fragment).not.toMatch(/sobre sellado/i); // el sobre sellado es del N3 (confesión de Jekyll)
   });
 
   it('tono 10+: el episodio se narra sin mostrar violencia (D4)', () => {
@@ -438,11 +445,11 @@ describe('level3 — quiz: pregunta y opciones verbatim (C correcta)', () => {
     expect(level3.quiz.question).toBe('¿De qué forma el Dr. Jekyll confiesa que él es Hyde?');
   });
 
-  it('4 opciones A–D con los textos VERBATIM del material fuente', () => {
+  it('4 opciones A–D con los textos del material fuente (C adaptada al cómic: la confesión de Jekyll)', () => {
     expect(level3.quiz.options.map((option) => option.text)).toEqual([
       'En un interrogatorio policial.',
       'Se lo dice en secreto a Poole y este se lo cuenta a todo el mundo.',
-      'Mediante una carta escrita a su amigo Utterson.',
+      'Mediante una confesión escrita por él mismo, hallada en un sobre sellado en el laboratorio.',
       'Lo cuenta por TikTok.',
     ]);
   });
@@ -460,9 +467,10 @@ describe('level3 — quiz: pregunta y opciones verbatim (C correcta)', () => {
     }
   });
 
-  it('el feedback de C referencia la confesión sellada que explica el tormento', () => {
+  it('el feedback de C referencia el sobre sellado con la confesión que explica el tormento (sin carta de Lanyon)', () => {
     expect(level3.quiz.options[2].feedback).toContain('confesión');
-    expect(level3.quiz.options[2].feedback).toContain('Lanyon');
+    expect(level3.quiz.options[2].feedback).toContain('sobre sellado');
+    expect(level3.quiz.options[2].feedback).not.toContain('Lanyon');
   });
 
   it('los feedbacks de A, B y D son específicos de cada distractor', () => {
@@ -472,7 +480,7 @@ describe('level3 — quiz: pregunta y opciones verbatim (C correcta)', () => {
   });
 });
 
-describe('level3 — storyFragment: el episodio de las cartas sobre el escritorio', () => {
+describe('level3 — storyFragment: el episodio del sobre sellado con la confesión (cómic)', () => {
   const fragment = level3.quiz.storyFragment;
 
   it('no vacío y con 3–5 oraciones (ritmo de lectura)', () => {
@@ -481,15 +489,53 @@ describe('level3 — storyFragment: el episodio de las cartas sobre el escritori
     expect(sentenceCount(fragment)).toBeLessThanOrEqual(5);
   });
 
-  it('contiene los ingredientes del episodio: Poole y Utterson entran, las dos cartas, la verdad para el lector', () => {
+  it('contiene los ingredientes del episodio: Poole y Utterson entran, un único sobre con la confesión de Jekyll, la verdad para el lector', () => {
     expect(fragment).toContain('Poole');
     expect(fragment).toContain('Utterson');
-    expect(fragment).toContain('Lanyon');
+    expect(fragment).toContain('Newcomen');
+    expect(fragment).toMatch(/un único sobre/);
     expect(fragment).toContain('confesión');
     expect(fragment).toContain('Jekyll');
   });
 
+  it('alineado al cómic: UNA sola confesión (sin carta de Lanyon) y el cuerpo de Jekyll desaparece', () => {
+    expect(fragment).not.toMatch(/Lanyon/i);
+    expect(fragment).not.toMatch(/dos documentos|dos cartas/);
+    expect(fragment).toContain('rastro'); // del doctor Jekyll no queda rastro
+  });
+
   it('tono 10+: el final se narra sin mostrar violencia (D4)', () => {
     expect(fragment).not.toMatch(/sangre|atropell|pisote|muert/i);
+  });
+});
+
+describe('guard de regresión — alineación al cómic: NO existe carta de Lanyon', () => {
+  /**
+   * Fuente de verdad (el cómic): Lanyon muere ASESINADO a bastonazos por
+   * Hyde en una calle nevada y NO deja ningún documento. La única carta
+   * dirigida a Utterson es la «Confesión Completa de Henry Jekyll», hallada
+   * en un sobre sellado en el laboratorio (N3). Este guarda recorre TODO
+   * texto de los niveles y prohíbe que la «carta de Lanyon» vuelva a
+   * colarse (ni como «carta del doctor Lanyon» ni variantes).
+   */
+  const levelTexts: readonly string[] = LEVELS.flatMap((level) => [
+    level.title,
+    ...level.lore.map((panel) => panel.text),
+    level.action.hudLabel,
+    ...(level.action.mechanic === 'cane-strike' ? [level.action.victoryLine] : []),
+    level.quiz.question,
+    ...level.quiz.options.flatMap((option) => [option.text, option.feedback]),
+    level.quiz.storyFragment,
+  ]);
+
+  it('el guarda recorre los textos de los 3 niveles (lore + quiz + fragmentos)', () => {
+    expect(levelTexts.length).toBeGreaterThanOrEqual(3 * 10);
+  });
+
+  it('ningún texto de nivel menciona la «carta de Lanyon» / «carta del doctor Lanyon»', () => {
+    const pattern = /carta\s+(de|del)\s+(doctor\s+|dr\.\s*)?lanyon/i;
+    for (const [index, text] of levelTexts.entries()) {
+      expect(pattern.test(text), `el texto ${index} menciona una carta de Lanyon: «${text}»`).toBe(false);
+    }
   });
 });
