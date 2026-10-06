@@ -4,7 +4,7 @@
  *  - Fondo de callejón con niebla en deriva (parallax data-driven: la tabla
  *    `MENU_PARALLAX_LAYERS` de `src/art/parallax.ts` + `driftOffset` pura;
  *    este archivo solo consume datos). Farolas con flicker (`lampFlicker`).
- *  - Título «Jekyll & Hyde [TBD]» (placeholder, SPEC §1.1) con fade-in en
+ *  - Título «Jekyll & Hyde» con fade-in en
  *    UnifrakturCook (clave CSS, cargada en PRELOAD) + subtítulo del SPEC §6.
  *  - Botones GothicButton desde `menuButtonsFor(save)`: «Comenzar el viaje»,
  *    «Cómo jugar» y «Continuar» SOLO si `save.inProgress` (SPEC §11).

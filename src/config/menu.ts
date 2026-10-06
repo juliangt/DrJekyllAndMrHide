@@ -9,8 +9,8 @@
 import { SceneKey, type SceneKey as SceneKeyType } from './sceneKeys';
 import { TEXTURE_KEYS } from '../art/textures';
 
-/** Título placeholder (SPEC §1.1: pendiente de decisión, usa «[TBD]»). */
-export const MENU_TITLE = 'Jekyll & Hyde [TBD]';
+/** Título del juego. */
+export const MENU_TITLE = 'Jekyll & Hyde';
 
 /** Subtítulo literal del SPEC §6. */
 export const MENU_SUBTITLE = 'Una aventura por el libro de R. L. Stevenson';

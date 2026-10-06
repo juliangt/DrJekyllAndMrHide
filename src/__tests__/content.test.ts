@@ -99,7 +99,6 @@ const FORBIDDEN_STEMS: readonly string[] = [
 
 /** Palabras con mayúscula sostenida permitidas (siglas/placeholders). */
 const UPPERCASE_ALLOWLIST = new Set([
-  'TBD', // placeholder del título pendiente (SPEC §1.1)
   '188X', // década imprecisa del panel 1, VERBATIM de SPEC §4.1 («Londres, 188X»)
 ]);
 

@@ -154,8 +154,8 @@ describe('MenuScene — wiring del flujo (leído como fuente: jsdom no puede car
 });
 
 describe('Textos del menú (SPEC §6)', () => {
-  it('título placeholder y subtítulo literal', () => {
-    expect(MENU_TITLE).toBe('Jekyll & Hyde [TBD]');
+  it('título y subtítulo literales', () => {
+    expect(MENU_TITLE).toBe('Jekyll & Hyde');
     expect(MENU_SUBTITLE).toBe('Una aventura por el libro de R. L. Stevenson');
   });
 });

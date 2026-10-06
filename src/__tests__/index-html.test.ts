@@ -42,8 +42,8 @@ describe('index.html — tipografías Google Fonts (SPEC §7.3)', () => {
 });
 
 describe('index.html — metadatos de página', () => {
-  it('declara idioma español y el título placeholder', () => {
+  it('declara idioma español y el título del juego', () => {
     expect(html).toContain('<html lang="es">');
-    expect(html).toContain('Jekyll &amp; Hyde [TBD]');
+    expect(html).toContain('Jekyll &amp; Hyde</title>');
   });
 });
