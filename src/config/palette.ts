@@ -47,6 +47,13 @@ export const lampFire: HexColor = '#e8b45a';
 /** Púrpura poción (acentos de narrativa). */
 export const potionPurple: HexColor = '#7a4f8f';
 
+/**
+ * Humo de Hyde (casi negro con matiz púrpura profundo): los tentáculos de
+ * humo oscuro que envuelven a Jekyll en la transformación del comic
+ * (pp. 44–45, 53) — mucho más oscuro que `potionPurple`.
+ */
+export const hydeSmoke: HexColor = '#241a2e';
+
 /** Texto principal sobre fondos oscuros. */
 export const textPrimary: HexColor = '#e8e3d5';
 
@@ -69,6 +76,7 @@ export const PALETTE = {
   parchmentDark,
   lampFire,
   potionPurple,
+  hydeSmoke,
   textPrimary,
   success,
   error,

@@ -8,6 +8,10 @@
  *     bloques «game.config — registro de escenas»): wiring de la máquina,
  *     guards de idempotencia, el acto 2 (callejón, niña, amenaza sin
  *     contacto) y el cierre con wipe de niebla.
+ *
+ * Fase 5 (v1.1) — la intro abre TODA sesión: «Continuar» también la pasa
+ * (MenuScene le manda el nivel guardado) y el reenvío a NARRATIVE es la
+ * función PURA `introNarrativePayload` (`fromIntro` solo para el nivel 1).
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -27,12 +31,13 @@ import {
   INTRO_TRANSFORMATION,
   IntroBeatId,
   introFogSprites,
+  introNarrativePayload,
   isLastBeat,
   nextBeatIndex,
   puffTintFor,
 } from '../config/intro';
 import { BASE_HEIGHT, BASE_WIDTH } from '../config/dimensions';
-import { getLevel } from '../config/levels';
+import { getLevel, LEVELS } from '../config/levels';
 import { LAB_PARALLAX_LAYERS } from '../art/parallax';
 import { TEXTURE_KEYS } from '../art/textures';
 import { NARRATIVE_INTRO_RETOLD_PANELS, NARRATIVE_SKIP_BUTTON } from '../config/narrative';
@@ -175,8 +180,9 @@ describe('INTRO — destino y presupuesto de niebla', () => {
     const labFogSlots = LAB_PARALLAX_LAYERS.filter(
       (layer) => layer.key === TEXTURE_KEYS.fog,
     ).reduce((sum, layer) => sum + layer.slots.length, 0);
-    // 8 (transformación) + 3 unitarios (trago, farol, ojo) + 2 (acecho) + 5 (cierre).
-    expect(introFogSprites()).toBe(18);
+    // 8 (transformación) + 3 (humo oscuro) + 3 unitarios (trago, farol, ojo)
+    // + 2 (acecho) + 5 (cierre).
+    expect(introFogSprites()).toBe(21);
     expect(labFogSlots + introFogSprites()).toBeLessThanOrEqual(30);
   });
 
@@ -210,7 +216,7 @@ describe('configs de animación por beat', () => {
     expect(INTRO_DRINK.gulp.scale).toBeGreaterThan(0);
   });
 
-  it('TRANSFORMATION: flash, sacudida, puffs, crossfade, pop y halo con valores válidos', () => {
+  it('TRANSFORMATION: flash, sacudida, puffs, humo oscuro, crossfade, pop y halo con valores válidos', () => {
     const T = INTRO_TRANSFORMATION;
     expect(T.flash.durationMs).toBeGreaterThan(0);
     expect(T.flash.peakAlpha).toBeGreaterThan(0);
@@ -229,6 +235,31 @@ describe('configs de animación por beat', () => {
     expect(T.halo.startAlpha).toBeGreaterThan(0);
     expect(T.halo.toScale).toBeGreaterThan(T.halo.fromScale);
     expect(T.halo.durationMs).toBeGreaterThan(0);
+  });
+
+  it('TRANSFORMATION — humo OSCURO serpenteante: 2–4 volutas casi negras, distintas del anillo claro (el comic pp. 44–45, 53)', () => {
+    const D = INTRO_TRANSFORMATION.darkPuffs;
+    // «2–4 puffs de humo oscuro» (brief del comic: tentáculos alrededor del cuerpo).
+    expect(D.count).toBeGreaterThanOrEqual(2);
+    expect(D.count).toBeLessThanOrEqual(4);
+    // Tinte OSCURO (casi negro/púrpura profundo): lejos de los tintes claros
+    // del anillo de puffs (verde/púrpura de la poción).
+    expect(D.color).not.toBe(INTRO_TRANSFORMATION.puffs.tints[0]);
+    expect(D.color).not.toBe(INTRO_TRANSFORMATION.puffs.tints[1]);
+    // '#241a2e' (hydeSmoke): canal rojo y verde MUY bajos — humo casi negro.
+    const rgb = D.color.slice(1).match(/.{2}/g)?.map((c) => Number.parseInt(c, 16)) ?? [];
+    expect(rgb[0]).toBeLessThan(0x40);
+    expect(rgb[1]).toBeLessThan(0x30);
+    expect(rgb[2]).toBeLessThan(0x40);
+    // Subida serpenteante: duración y altura positivas, mecido visible pero
+    // contenido (no se va del personaje), alfa que no tapa al sprite.
+    expect(D.durationMs).toBeGreaterThan(0);
+    expect(D.risePx).toBeGreaterThan(0);
+    expect(D.swayPx).toBeGreaterThan(0);
+    expect(D.swayPx).toBeLessThan(60);
+    expect(D.peakAlpha).toBeGreaterThan(0);
+    expect(D.peakAlpha).toBeLessThanOrEqual(0.7);
+    expect(D.staggerMs).toBeGreaterThanOrEqual(0);
   });
 
   it('puffTintFor alterna los tintes de forma determinista', () => {
@@ -319,6 +350,7 @@ describe('configs de animación del acto 2 (el callejón)', () => {
   it('introFogSprites suma los puffs transitorios de TODA la cinemática (datos puros)', () => {
     expect(introFogSprites()).toBe(
       INTRO_TRANSFORMATION.puffs.count +
+        INTRO_TRANSFORMATION.darkPuffs.count +
         INTRO_MENACE.puffs.count +
         INTRO_PLAYER_IS_HYDE.puffs.count +
         3, // unitarios: el trago, el farol de la niña y el destello del ojo
@@ -379,6 +411,42 @@ describe('INTRO_SCENE_LAYOUT — composición de la escena', () => {
   });
 });
 
+// ---- Fase 5 (v1.1) — reenvío a NARRATIVE: { levelId, fromIntro } (datos puros) --
+
+describe('introNarrativePayload — la intro reenvía el nivel destino a NARRATIVE', () => {
+  it('REGRESIÓN (Fase 5): «Continuar» (levelId guardado) llega por la intro y el payload lo conserva', () => {
+    // MenuScene pasa { levelId: save.currentLevel } a la intro; la intro lo
+    // reenvía a NARRATIVE sin perderlo (antes iba directo y saltaba la intro).
+    expect(introNarrativePayload(2)).toEqual({ levelId: 2, fromIntro: false });
+    expect(introNarrativePayload(3)).toEqual({ levelId: 3, fromIntro: false });
+  });
+
+  it('fromIntro es true SOLO para el nivel 1: sus paneles 1–3 ya se vieron animados', () => {
+    expect(introNarrativePayload(1)).toEqual({ levelId: 1, fromIntro: true });
+    expect(introNarrativePayload(INTRO_TARGET_LEVEL_ID).fromIntro).toBe(true);
+    for (const level of LEVELS) {
+      expect(introNarrativePayload(level.id).fromIntro, `nivel ${level.id}`).toBe(
+        level.id === INTRO_TARGET_LEVEL_ID,
+      );
+    }
+  });
+
+  it('sin payload (o inválido) cae al nivel 1 con fromIntro: partida nueva / «Comenzar el viaje»', () => {
+    expect(introNarrativePayload(undefined)).toEqual({ levelId: 1, fromIntro: true });
+    expect(introNarrativePayload(Number.NaN)).toEqual({ levelId: 1, fromIntro: true });
+    expect(introNarrativePayload(2.5)).toEqual({ levelId: 1, fromIntro: true }); // no entero
+    expect(introNarrativePayload(0)).toEqual({ levelId: 1, fromIntro: true }); // fuera de registro
+    expect(introNarrativePayload(99)).toEqual({ levelId: 1, fromIntro: true });
+  });
+
+  it('todo levelId registrado de LEVELS se conserva (la narrativa del guardado se lee COMPLETA si > 1)', () => {
+    for (const level of LEVELS) {
+      expect(introNarrativePayload(level.id).levelId).toBe(level.id);
+      expect(getLevel(introNarrativePayload(level.id).levelId)).toBeDefined();
+    }
+  });
+});
+
 // ---- IntroScene — wiring leído como fuente (jsdom no puede cargar Phaser) ------
 
 describe('IntroScene — wiring de la máquina de beats (leído como fuente)', () => {
@@ -402,26 +470,34 @@ describe('IntroScene — wiring de la máquina de beats (leído como fuente)', (
     expect(source).toContain('for (const fx of this.beatFx)');
   });
 
-  it('la transformación usa flash fullscreen, shake de cámara, puffs y crossfade', () => {
+  it('la transformación usa flash fullscreen, shake de cámara, puffs, humo oscuro y crossfade', () => {
     expect(source).toContain('this.cameras.main.shake(');
     expect(source).toContain('INTRO_TEXTURES.puff');
+    expect(source).toContain('this.spawnTransformationPuffs()');
+    // Humo OSCURO serpenteante (tentáculos del comic) que muere con clearBeatFx.
+    expect(source).toContain('this.spawnDarkSmoke()');
+    expect(source).toMatch(
+      /private spawnDarkSmoke\(\): void[\s\S]*?INTRO_TRANSFORMATION\.darkPuffs[\s\S]*?this\.beatFx\.push\(puff\)/,
+    );
     expect(source).toContain('alpha: { from: 1, to: 0 }'); // Jekyll se apaga…
     expect(source).toContain('alpha: { from: 0, to: 1 }'); // …mientras Hyde aparece
     expect(source).toContain('Back.easeOut'); // pop de escala al revelar
   });
 
-  it('el cierre es SIEMPRE wipe de niebla hacia NARRATIVE con { levelId, fromIntro }', () => {
-    expect(source).toContain(
-      'wipeTo(this, SceneKey.NARRATIVE, { levelId: INTRO_TARGET_LEVEL_ID, fromIntro: true })',
-    );
+  it('el cierre es SIEMPRE wipe de niebla hacia NARRATIVE con el payload { levelId, fromIntro }', () => {
+    // El payload lo arma la función PURA `introNarrativePayload` (config/intro,
+    // testeada abajo): lee el levelId del payload de ARRANQUE de la escena.
+    expect(source).toContain('const data = (this.scene.settings.data ?? {}) as IntroSceneData');
+    expect(source).toContain('wipeTo(this, SceneKey.NARRATIVE, introNarrativePayload(data.levelId))');
     // Un único punto de salida (exitToNarrative con guard propio).
     expect(source.match(/wipeTo\(/g)?.length).toBe(1);
   });
 
-  it('la intro pasa fromIntro: la narrativa NO repite los paneles que la cinemática ya contó', () => {
-    // Los beats del acto 2 retoman los paneles 3–4 del lore (continuidad)…
-    expect(source).toContain('fromIntro: true');
-    // …y la config narrativa define cuántos paneles cuenta la cinemática.
+  it('la intro pasa fromIntro SOLO para el nivel 1: la narrativa NO repite los paneles que la cinemática ya contó', () => {
+    // La decisión vive en la función pura de config (testeada abajo)…
+    expect(source).toContain('introNarrativePayload(data.levelId)');
+    // …y la config narrativa define cuántos paneles cuenta la cinemática
+    // (los beats del acto 2 retoman los paneles 3–4 del lore, continuidad).
     expect(NARRATIVE_INTRO_RETOLD_PANELS).toBe(3);
   });
 

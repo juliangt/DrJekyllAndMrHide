@@ -13,6 +13,7 @@ import {
   fogNear,
   hexToNumber,
   hexToRgb,
+  hydeSmoke,
   labGreen,
   lampFire,
   nightBackground,
@@ -79,7 +80,7 @@ describe('palette — formato e invariants', () => {
     }
   });
 
-  it('los 14 colores de la SPEC §7.1 están en el objeto agrupado', () => {
+  it('los 15 colores de la SPEC §7.1 (+ hydeSmoke de la cinemática) están en el objeto agrupado', () => {
     expect(Object.keys(PALETTE).sort()).toEqual(
       [
         'buildings',
@@ -87,6 +88,7 @@ describe('palette — formato e invariants', () => {
         'fogFar',
         'fogMid',
         'fogNear',
+        'hydeSmoke',
         'labGreen',
         'lampFire',
         'nightBackground',
@@ -112,12 +114,13 @@ describe('palette — formato e invariants', () => {
     expect(PALETTE.parchmentDark).toBe(parchmentDark);
     expect(PALETTE.lampFire).toBe(lampFire);
     expect(PALETTE.potionPurple).toBe(potionPurple);
+    expect(PALETTE.hydeSmoke).toBe(hydeSmoke);
     expect(PALETTE.textPrimary).toBe(textPrimary);
     expect(PALETTE.success).toBe(success);
     expect(PALETTE.error).toBe(error);
   });
 
-  it('los 14 colores son distintos entre sí', () => {
+  it('los 15 colores son distintos entre sí', () => {
     const values = Object.values(PALETTE);
     expect(new Set(values).size).toBe(values.length);
   });

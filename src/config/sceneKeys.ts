@@ -7,8 +7,9 @@
  * → reintentar ACTION»). Su clave existe aquí porque el mapa de navegación
  * (`src/scenes/sceneNav.ts`) lo modela como nodo del grafo igual que al resto.
  *
- * `INTRO` es la cinemática que corre ANTES del primer nivel (el Dr. Jekyll
- * se transforma en Mr. Hyde): solo se ve saliendo del menú (MENU → INTRO).
+ * `INTRO` es la cinemática que corre ANTES de la narrativa (el Dr. Jekyll
+ * se transforma en Mr. Hyde): se ve al salir del menú (MENU → INTRO), tanto
+ * con «Comenzar el viaje» como con «Continuar» (v1.1: abre TODA sesión).
  *
  * NOTA — «enum»: `tsconfig` usa `erasableSyntaxOnly: true`, que prohíbe los
  * `enum` de TypeScript (generan código en runtime). Este objeto `const` +

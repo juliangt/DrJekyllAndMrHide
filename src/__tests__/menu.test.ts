@@ -3,7 +3,15 @@
  * `menuButtonsFor` (Continuar visible si y sólo si inProgress, SPEC §11),
  * `beginJourney` (marcar inProgress al comenzar nivel), los textos del
  * titular y los 3 pasos del «Cómo jugar» (SPEC §6/§9).
+ *
+ * Fase 5 (v1.1) — «Continuar» TAMBIÉN pasa por la INTRO (la cinemática abre
+ * TODA sesión): se valida el `target` de los descriptores y el wiring de
+ * MenuScene LEYENDO EL FUENTE (patrón de los tests de IntroScene: jsdom no
+ * puede cargar Phaser) — la rama Continue navega a INTRO con el nivel
+ * guardado y NO llama `beginJourney` (eso es solo de partida nueva).
  */
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
   HOW_TO_PLAY,
@@ -67,13 +75,14 @@ describe('menuButtonsFor — qué botones mostrar (SPEC §6/§11)', () => {
     expect(labels).toEqual(['Comenzar el viaje', 'Cómo jugar', 'Continuar']);
   });
 
-  it('«Comenzar» navega a INTRO (cinemática SOLO en partida nueva); «Continuar» va DIRECTO a NARRATIVE; «Cómo jugar» no navega', () => {
+  it('«Comenzar» y «Continuar» navegan AMBOS a INTRO (la cinemática abre toda sesión); «Cómo jugar» no navega', () => {
     const buttons = menuButtonsFor({ inProgress: true });
     const byId = new Map(buttons.map((b) => [b.id, b]));
     expect(byId.get(MenuButtonId.Start)?.target).toBe(SceneKey.INTRO);
-    // Fase 4: reanudar salta la intro — el nivel lo pasa MenuScene desde
-    // save.currentLevel (el descriptor es el dato; el payload, la escena).
-    expect(byId.get(MenuButtonId.Continue)?.target).toBe(SceneKey.NARRATIVE);
+    // Fase 5 (v1.1): reanudar TAMBIÉN pasa por la intro — el nivel de destino
+    // lo pasa MenuScene desde save.currentLevel (el descriptor es el dato; el
+    // payload, la escena; la intro lo reenvía a NARRATIVE al cerrar).
+    expect(byId.get(MenuButtonId.Continue)?.target).toBe(SceneKey.INTRO);
     expect(byId.get(MenuButtonId.HowToPlay)?.target).toBeUndefined();
   });
 
@@ -110,6 +119,37 @@ describe('beginJourney — «Comenzar» marca inProgress Y reinicia el checkpoin
     const reloaded = new SaveSystem(storage);
     expect(reloaded.inProgress).toBe(true);
     expect(reloaded.currentLevel).toBe(1);
+  });
+});
+
+describe('MenuScene — wiring del flujo (leído como fuente: jsdom no puede cargar Phaser)', () => {
+  const source = readFileSync(resolve(process.cwd(), 'src/scenes/MenuScene.ts'), 'utf8');
+
+  it('REGRESIÓN (Fase 5): «Continuar» navega a INTRO con el nivel GUARDADO en el payload', () => {
+    // La rama Continue pasa { levelId: saveSystem.currentLevel } — la intro
+    // es quien reenvía el destino a NARRATIVE al cerrar.
+    expect(source).toContain(
+      'transitionTo(this, SceneKey.INTRO, { levelId: saveSystem.currentLevel })',
+    );
+  });
+
+  it('«Continuar» NO llama beginJourney (solo de partida nueva: resetearía el checkpoint a 1)', () => {
+    // beginJourney aparece EXACTAMENTE una vez en la escena: en la rama Start.
+    expect(source.match(/beginJourney\(/g)?.length).toBe(1);
+    expect(source).toMatch(
+      /MenuButtonId\.Start[\s\S]*?beginJourney\(saveSystem\);[\s\S]*?SceneKey\.INTRO\)/,
+    );
+    // Y la rama Continue no lo toca: entre su guard y su transición no hay
+    // ninguna otra llamada de save (el checkpoint queda intacto).
+    expect(source).toMatch(
+      /MenuButtonId\.Continue[\s\S]*?transitionTo\(this, SceneKey\.INTRO, \{ levelId: saveSystem\.currentLevel \}\);/,
+    );
+  });
+
+  it('«Comenzar» sigue el flujo de partida nueva: beginJourney + INTRO (payload sin levelId: default 1)', () => {
+    expect(source).toMatch(
+      /beginJourney\(saveSystem\);[\s\S]*?transitionTo\(this, SceneKey\.INTRO\);/,
+    );
   });
 });
 

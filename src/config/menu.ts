@@ -41,11 +41,13 @@ export interface MenuButtonDescriptor {
 /**
  * Qué botones mostrar (SPEC §6): «Comenzar el viaje» y «Cómo jugar»
  * siempre; «Continuar» SOLO si `save.inProgress === true` (SPEC §11).
- * Destinos (Fase 4 del multi-nivel): «Comenzar» navega a INTRO — la
- * cinemática (Jekyll → Hyde) SOLO se ve al empezar una partida nueva y
- * desemboca en la narrativa del N1; «Continuar» va DIRECTO a NARRATIVE
- * (sin intro) y MenuScene le pasa `{ levelId: save.currentLevel }`, el
- * checkpoint guardado (el `target` es el dato; el payload lo arma la escena).
+ * Destinos (Fase 5, v1.1): AMBOS botones de juego navegan a INTRO — la
+ * cinemática (Jekyll → Hyde) abre TODA sesión. «Comenzar» marca
+ * `inProgress` + checkpoint 1 (`beginJourney`) y la intro desemboca en la
+ * narrativa del N1; «Continuar» NO toca el checkpoint y MenuScene le pasa
+ * `{ levelId: save.currentLevel }` a la intro, que reenvía el nivel guardado
+ * a NARRATIVE al cerrar (el `target` es el dato; el payload lo arma la
+ * escena).
  */
 export function menuButtonsFor(save: { inProgress: boolean }): readonly MenuButtonDescriptor[] {
   const buttons: MenuButtonDescriptor[] = [
@@ -60,11 +62,12 @@ export function menuButtonsFor(save: { inProgress: boolean }): readonly MenuButt
     },
   ];
   if (save.inProgress) {
-    // Reanudar = narrativa del nivel guardado, SIN reproducir la intro.
+    // Reanudar = la cinemática con el nivel guardado como destino (la intro
+    // lo reenvía a NARRATIVE al cerrar — el checkpoint NO se toca aquí).
     buttons.push({
       id: MenuButtonId.Continue,
       label: 'Continuar',
-      target: SceneKey.NARRATIVE,
+      target: SceneKey.INTRO,
     });
   }
   return buttons;

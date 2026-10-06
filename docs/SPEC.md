@@ -74,7 +74,7 @@ BOOT ──► PRELOAD ──► MENU ──► INTRO ──► NARRATIVE ──
 | `BOOT` | Init: genera texturas procedurales, crea sistemas (save/audio/score). | → `PRELOAD` |
 | `PRELOAD` | Carga tipografías web (Google Fonts) con pantalla mínima. | → `MENU` |
 | `MENU` | Splash gótico: título, «Comenzar el viaje», «Cómo jugar», «Continuar» si hay save. | → `INTRO` (también «Continuar», v1) |
-| `INTRO` | Cinemática de introducción (§4.1): Jekyll bebe la fórmula y se transforma en Hyde; Hyde acecha a la niña en el callejón (el golpe nunca cae, D4). Avance por tap. | fin o «Saltar» → `NARRATIVE` (N1) |
+| `INTRO` | Cinemática de introducción (§4.1): Jekyll bebe la fórmula y se transforma en Hyde; Hyde acecha a la niña en el callejón (el golpe nunca cae, D4). Avance por tap. | fin o «Saltar» → `NARRATIVE` (N1, o el nivel guardado si se llegó con «Continuar») |
 | `NARRATIVE` | Viñeta del nivel (paneles de texto + arte de fondo), avance por tap. | → `ACTION` |
 | `ACTION` | Minijuego arcade del nivel (§4.2). | meta → `QUIZ` · timeout → `GAME_OVER` |
 | `GAME_OVER` | Overlay animoso: «La niebla lo ocultó todo… ¡inténtalo de nuevo!». **No es fin de partida.** | → reintentar `ACTION` (mismo nivel) |
@@ -380,8 +380,8 @@ interface SaveData {
 ```
 
 - Se guarda al: comenzar nivel, completar quiz correcto, terminar partida, toggle de mute.
-- «Continuar» en Menu visible solo si `inProgress === true` (v1: reanuda por la cinemática de
-  introducción hasta la narrativa del N1).
+- «Continuar» en Menu visible solo si `inProgress === true` (reanuda por la cinemática de
+  introducción —que se ve en TODA sesión— hasta la narrativa del nivel guardado).
 - Al completar `VICTORY`, el save conserva `lastScore` como récord; «Jugar de nuevo» resetea la tanda.
 - Save corrupto o ausente ⇒ arranque limpio sin errores (try/catch + valores por defecto).
 

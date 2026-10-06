@@ -8,11 +8,11 @@
  * solo importa Phaser como TIPO y los helpers (`transitionTo`, `wipeTo`)
  * se ejercitan con fakes estructurales en tests y en el navegador.
  *
- * Grafo (SPEC §3, Fase 4 del multi-nivel — la intro SOLO con «Comenzar»):
+ * Grafo (SPEC §3, Fase 5 del multi-nivel — la intro abre TODA sesión):
  *
- *   BOOT → PRELOAD → MENU ─«Comenzar»→ INTRO (fromIntro) ─┐
- *            └───«Continuar» (sin intro, nivel guardado)──┤
- *                                                         ▼
+ *   BOOT → PRELOAD → MENU ─«Comenzar»───────→ INTRO ─┐
+ *            └───────«Continuar» (nivel guardado)────┤
+ *                                                    ▼
  *                     NARRATIVE {N} → ACTION {N} → QUIZ {N}
  *                        ▲ timeout│           │ ✔ correcto (nextAfterQuiz)
  *                        │        │           ├─ hay N+1 → NARRATIVE {N+1}
@@ -22,9 +22,11 @@
  *   VICTORY (final de la obra, solo tras el nivel 3) → MENU («Volver al
  *   inicio»); «Jugar de nuevo» re-abre NARRATIVE {1} (tanda nueva).
  *
- * NOTA — la intro SOLO se reproduce con «Comenzar el viaje» (MENU → INTRO):
- * las aristas alternativas NO la reproducen — ni el quiz fallido (D5), ni
- * «Continuar», que va DIRECTO a la narrativa del nivel guardado.
+ * NOTA — la intro se reproduce en TODA salida del menú hacia el juego (MENU →
+ * INTRO, con «Comenzar» o con «Continuar» — v1.1): MenuScene le pasa el nivel
+ * de destino y la intro lo reenvía a NARRATIVE al cerrar (`fromIntro` solo
+ * para el nivel 1). Las DEMÁS aristas alternativas NO la reproducen — ni el
+ * quiz fallido (D5), ni el timeout del minijuego.
  *
  * La salida correcta del quiz es CONDICIONAL (Fase 4): la decide
  * `nextAfterQuiz(levelId)` (abajo), probada contra el registro `LEVELS`.
@@ -53,8 +55,8 @@ import { getLevel } from '../config/levels';
 export const NEXT_SCENE: Readonly<Record<SceneKeyType, SceneKeyType>> = {
   [SceneKey.BOOT]: SceneKey.PRELOAD,
   [SceneKey.PRELOAD]: SceneKey.MENU,
-  [SceneKey.MENU]: SceneKey.INTRO, // la intro solo se ve con «Comenzar el viaje»
-  [SceneKey.INTRO]: SceneKey.NARRATIVE, // fin de la cinemática → narrativa del N1 (fromIntro)
+  [SceneKey.MENU]: SceneKey.INTRO, // «Comenzar» y «Continuar» pasan por la cinemática (payload lo arma MenuScene)
+  [SceneKey.INTRO]: SceneKey.NARRATIVE, // fin de la cinemática → narrativa del nivel destino (levelId + fromIntro)
   [SceneKey.NARRATIVE]: SceneKey.ACTION,
   [SceneKey.ACTION]: SceneKey.QUIZ, // meta 3/3 alcanzada
   [SceneKey.GAME_OVER]: SceneKey.ACTION, // «Reintentar»: SOLO el minijuego

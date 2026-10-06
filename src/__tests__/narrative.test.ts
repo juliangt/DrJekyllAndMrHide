@@ -223,8 +223,14 @@ describe('fromIntro — SOLO la cinemática lo pasa (Fase 4: N2/N3 arrancan SIEM
     expect(sceneSource).toContain('narrativeStartIndex(data.fromIntro ?? false, total)');
   });
 
-  it('la ÚNICA llamada con fromIntro:true es el cierre de IntroScene (→ N1 con paneles 1–3 contados)', () => {
-    expect(readSource('src/scenes/IntroScene.ts')).toContain('fromIntro: true');
+  it('la ÚNICA salida con fromIntro es el cierre de IntroScene, vía la función pura introNarrativePayload (fromIntro true solo para N1 — Fase 5)', () => {
+    expect(readSource('src/scenes/IntroScene.ts')).toContain(
+      'wipeTo(this, SceneKey.NARRATIVE, introNarrativePayload(data.levelId))',
+    );
+    // La decisión (fromIntro true SOLO para el nivel 1) vive en config/intro.
+    expect(readSource('src/config/intro.ts')).toContain(
+      'fromIntro: target === INTRO_TARGET_LEVEL_ID',
+    );
   });
 
   it('ninguna OTRA escena pasa fromIntro: la narrativa de N2/N3 (quiz→N, continuar) empieza completa', () => {

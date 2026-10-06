@@ -13,11 +13,11 @@
  *   «Continuar» desaparece) → recarga (récord y levelsCompleted intactos)
  *
  * más el flujo MULTI-NIVEL de la Fase 4 (checkpoint `currentLevel`:
- * avanzar de quiz lo mueve al siguiente nivel; «Continuar» reanuda SIN
- * intro; el fallo y el timeout no lo tocan) y los bordes: mute persistente
- * entre instancias, save corrupto a mitad (defaults sin romper, y el juego
- * sigue escribiendo después) y escritura que falla (cuota/modo privado: el
- * juego vive en memoria).
+ * avanzar de quiz lo mueve al siguiente nivel; «Continuar» reanuda —desde la
+ * Fase 5 TAMBIÉN pasa por la intro—; el fallo y el timeout no lo tocan) y los
+ * bordes: mute persistente entre instancias, save corrupto a mitad (defaults
+ * sin romper, y el juego sigue escribiendo después) y escritura que falla
+ * (cuota/modo privado: el juego vive en memoria).
  *
  * El wiring con las escenas ya está cubierto por `menuButtonsFor`
  * (menu.test.ts) — aquí se ejercita ESE contrato de punta a punta.
@@ -155,15 +155,16 @@ describe('flujo multi-nivel — continuar reanuda el nivel guardado (Fase 4)', (
     //    registra el nivel SIGUIENTE como checkpoint antes de transicionar.
     session1.setCurrentLevel(2);
 
-    // 3. RELOAD: el checkpoint sobrevive y «Continuar» apunta a NARRATIVE
-    //    (sin intro) — MenuScene pasará {levelId: currentLevel}.
+    // 3. RELOAD: el checkpoint sobrevive y «Continuar» pasa por la INTRO con
+    //    ese nivel como destino (Fase 5) — MenuScene pasará
+    //    {levelId: currentLevel} y la intro lo reenvía a NARRATIVE al cerrar.
     const session2 = new SaveSystem(storage);
     expect(session2.inProgress).toBe(true);
     expect(session2.currentLevel).toBe(2);
     const continueButton = menuButtonsFor(session2.getData()).find(
       (b) => b.id === 'continue',
     );
-    expect(continueButton?.target).toBe(SceneKey.NARRATIVE);
+    expect(continueButton?.target).toBe(SceneKey.INTRO);
 
     // 4. Quiz correcto del N2 → checkpoint 3; luego el N3 se completa
     //    (markLevelComplete con el id REAL de VictoryScene) y cierra.

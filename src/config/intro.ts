@@ -6,8 +6,10 @@
  * ALZA EL BRAZO: amenaza sugerida, jamás contacto (la niña queda «asustada
  * pero ilesa», lore del quiz del N1). El cierre dirige al JUGADOR («tú eres
  * Mr. Hyde») para que se entienda que los toques del minijuego los da Hyde.
- * Al terminar se pasa a la narrativa del nivel 1 (`SceneKey.NARRATIVE` con
- * `{ levelId }`).
+ * Al terminar se pasa a la narrativa del nivel de destino (`SceneKey.NARRATIVE`
+ * con `{ levelId, fromIntro }`): el nivel 1 por defecto, o el que traiga el
+ * payload de arranque cuando se llega con «Continuar» (v1.1: la cinemática
+ * abre TODA sesión — partida nueva O reanudada).
  *
  * Arquitectura data-first (mismo espíritu que `config/narrative.ts`): TODO lo
  * testeable vive aquí, sin Phaser en runtime (jsdom no puede cargarlo) —
@@ -24,15 +26,18 @@
  *     `INTRO_GIRL_APPEARS` / `INTRO_MENACE` / `INTRO_PLAYER_IS_HYDE` (acto 2).
  *  4. Layout de la escena: `INTRO_SCENE_LAYOUT` (posiciones sobre 720×1280,
  *     profundidades, estilo del letrero — tipografía Crimson Text, SPEC §7.3).
- *  5. Destino: `INTRO_TARGET_LEVEL_ID` (nivel al que se llega tras la intro).
+ *  5. Destino: `INTRO_TARGET_LEVEL_ID` (nivel por defecto tras la intro) y
+ *     `introNarrativePayload` (el reenvío `{ levelId, fromIntro }` a NARRATIVE).
  *
- * NOTA de flujo: la intro SOLO se reproduce saliendo del menú (MENU → INTRO);
- * las aristas alternativas (quiz fallido → NARRATIVE) NO la reproducen.
+ * NOTA de flujo: la intro se reproduce en TODA salida de menú hacia el juego
+ * (MENU → INTRO, con «Comenzar» o con «Continuar»); las aristas alternativas
+ * (quiz fallido → NARRATIVE) NO la reproducen.
  */
 
 import { BASE_WIDTH } from './dimensions';
-import { fogNear, labGreen, lampFire, parchmentDark, potionPurple } from './palette';
+import { fogNear, hydeSmoke, labGreen, lampFire, parchmentDark, potionPurple } from './palette';
 import { TEXTURE_KEYS } from '../art/textures';
+import { getLevel } from './levels';
 import type { HexColor } from './palette';
 
 // ---- 1. Identidades de los beats (const-object, NO enum) ---------------------
@@ -184,8 +189,8 @@ export const INTRO_DRINK = {
 /**
  * Beat «Transformation»: el corazón de la cinemática. Secuencia orquestada
  * por la escena con estos parámetros: flash fullscreen → sacudida de cámara
- * + temblor del sprite → puffs de niebla teñida → crossfade Jekyll→Hyde con
- * pop de escala → halo púrpura que se disipa.
+ * + temblor del sprite → puffs de niebla teñida + humo oscuro serpenteante →
+ * crossfade Jekyll→Hyde con pop de escala → halo púrpura que se disipa.
  */
 export const INTRO_TRANSFORMATION = {
   /** Flash fullscreen (rectángulo del color, alfa 0 → pico → 0 en yoyo). */
@@ -204,6 +209,29 @@ export const INTRO_TRANSFORMATION = {
     staggerMs: 55,
     /** Tintes alternados de los puffs (resabio verde/púrpura de la poción). */
     tints: [labGreen, potionPurple],
+  },
+  /**
+   * Humo OSCURO serpenteante (v1.1): 2–4 volutas casi negras/púrpura profundo
+   * que suben serpenteadas alrededor del cuerpo — en el comic la transformación
+   * envuelve a Jekyll con tentáculos de humo negro (pp. 44–45, 53). Tinte
+   * `hydeSmoke`, DISTINTO de los verdes/púrpuras claros del anillo de puffs.
+   */
+  darkPuffs: {
+    /** Presupuesto de niebla (SPEC §10.4 ≤ 30): también son sprites de niebla. */
+    count: 3,
+    /** Tinte casi negro (matiz púrpura: la sombra de la poción). */
+    color: hydeSmoke,
+    scale: 1.0,
+    /** Duración TOTAL de cada voluta (subida completa, ms). */
+    durationMs: 1250,
+    /** Desfase entre volutas (ms) — nacen escalonadas, como tentáculos. */
+    staggerMs: 210,
+    /** Altura de la subida (px): del torso hasta pasada la cabeza. */
+    risePx: 200,
+    /** Amplitud del mecido horizontal (serpenteo, px). */
+    swayPx: 26,
+    /** Alfa pico de cada voluta (humo denso pero sin tapar al personaje). */
+    peakAlpha: 0.55,
   },
   /** Retardo del crossfade tras arrancar el flash (ms). */
   crossfadeDelayMs: 240,
@@ -386,11 +414,55 @@ export const INTRO_SCENE_LAYOUT = {
 // ---- 5. Destino --------------------------------------------------------------
 
 /**
- * Nivel al que se llega al terminar (o saltar) la intro: el 1 — la narrativa
- * continúa EXACTAMENTE donde la intro deja la historia. (Que el id exista en
- * `LEVELS` lo garantiza el test de `intro.test.ts`.)
+ * Nivel al que se llega al terminar (o saltar) la intro cuando NO hay nivel
+ * guardado: el 1 — la narrativa continúa EXACTAMENTE donde la intro deja la
+ * historia. Con «Continuar», `introNarrativePayload` usa el nivel del payload
+ * de arranque en su lugar. (Que el id exista en `LEVELS` lo garantiza el test
+ * de `intro.test.ts`.)
  */
 export const INTRO_TARGET_LEVEL_ID = 1;
+
+/**
+ * Datos de ARRANQUE de la escena (`scene.start(INTRO, data)`): `MenuScene`
+ * se los pasa al entrar — `{ levelId: save.currentLevel }` con «Continuar»,
+ * y sin data (o con el default) con «Comenzar el viaje».
+ */
+export interface IntroSceneData {
+  /** Nivel al que la intro debe desembocar (default: `INTRO_TARGET_LEVEL_ID`). */
+  levelId?: number;
+}
+
+/** Lo que la intro reenvía a NARRATIVE al cerrar (`scene.start` data). */
+export interface IntroNarrativePayload {
+  /** Nivel de destino (el del payload de arranque, o el 1 por defecto). */
+  levelId: number;
+  /**
+   * True SOLO si el destino es el nivel 1: la cinemática reproduce los
+   * paneles 1–3 del N1 (`NARRATIVE_INTRO_RETOLD_PANELS`), así que la
+   * narrativa arranca en el primer panel que NO contó. Para un nivel
+   * guardado > 1 la cinemática NO contó sus paneles: la narrativa de ese
+   * nivel se lee COMPLETA (empieza en el panel 0).
+   */
+  fromIntro: boolean;
+}
+
+/**
+ * Payload que la intro reenvía a NARRATIVE al cerrar (fin o «Saltar»), PURE
+ * y testeable sin Phaser:
+ *
+ *  - `levelId`: el que trajo el payload de arranque (`MenuScene` se lo pasa
+ *    con «Continuar» — el checkpoint guardado); si es inválido o ausente,
+ *    cae al `INTRO_TARGET_LEVEL_ID` (el 1: partida nueva / «Comenzar»).
+ *  - `fromIntro`: true SOLO para el nivel 1 (sus paneles 1–3 ya se vieron
+ *    animados en la cinemática); false para cualquier nivel > 1.
+ */
+export function introNarrativePayload(levelId: number | undefined): IntroNarrativePayload {
+  const target =
+    typeof levelId === 'number' && Number.isInteger(levelId) && getLevel(levelId) !== undefined
+      ? levelId
+      : INTRO_TARGET_LEVEL_ID;
+  return { levelId: target, fromIntro: target === INTRO_TARGET_LEVEL_ID };
+}
 
 /** Claves de textura que consume la escena (referencia testeable). */
 export const INTRO_TEXTURES = {
@@ -424,6 +496,7 @@ const SINGLE_PUFF_BEATS = 3;
 export function introFogSprites(): number {
   return (
     INTRO_TRANSFORMATION.puffs.count +
+    INTRO_TRANSFORMATION.darkPuffs.count +
     SINGLE_PUFF_BEATS +
     INTRO_MENACE.puffs.count +
     INTRO_PLAYER_IS_HYDE.puffs.count

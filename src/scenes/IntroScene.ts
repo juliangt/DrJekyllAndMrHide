@@ -5,9 +5,11 @@
  * escena, una niña con farol aparece en la esquina, Hyde la ve, avanza
  * acechando y ALZA EL BRAZO; la niña se encoge pero NADIE la toca (amenaza
  * sugerida, público 10+). El cierre dirige al jugador («Y tú eres Mr. Hyde»)
- * y al terminar (o saltar) se pasa a la narrativa del nivel 1
- * (`SceneKey.NARRATIVE` con `{ levelId }` vía `wipeTo`: «la niebla lo cubre
- * todo»).
+ * y al terminar (o saltar) se pasa a la narrativa del nivel de destino
+ * (`SceneKey.NARRATIVE` con `{ levelId, fromIntro }` vía `wipeTo`: «la niebla
+ * lo cubre todo»). El destino viene en el payload de arranque
+ * (`IntroSceneData.levelId`): 1 por defecto («Comenzar el viaje») o el nivel
+ * guardado ( «Continuar» — v1.1: la cinemática abre TODA sesión).
  *
  * ARQUITECTURA — MÁQUINA DE ACTOS/BEATS (data-first):
  *  - Los pasos viven como DATOS en `INTRO_BEATS` (`config/intro.ts`): array
@@ -67,14 +69,15 @@ import {
   INTRO_MENACE,
   INTRO_PLAYER_IS_HYDE,
   INTRO_SCENE_LAYOUT,
-  INTRO_TARGET_LEVEL_ID,
   INTRO_TEXTURES,
   INTRO_TRANSFORMATION,
   IntroBeatId,
+  introNarrativePayload,
   nextBeatIndex,
   puffTintFor,
   type IntroBeat,
   type IntroBeatId as IntroBeatIdType,
+  type IntroSceneData,
 } from '../config/intro';
 import { fadeIn, wipeTo } from './sceneNav';
 import { getSystems } from '../systems/getSystems';
@@ -522,9 +525,12 @@ export class IntroScene extends Phaser.Scene {
     if (this.audioSystem.isUnlocked) {
       this.audioSystem.wind(1.6);
     }
-    // `fromIntro`: la narrativa arranca en el primer panel que la cinemática
-    // NO contó (los 1–3 ya se vieron animados — no se lee la historia dos veces).
-    wipeTo(this, SceneKey.NARRATIVE, { levelId: INTRO_TARGET_LEVEL_ID, fromIntro: true });
+    // Destino: el nivel que trajo el payload de arranque (default 1 — ver
+    // `IntroSceneData`). `fromIntro` SOLO para el nivel 1: sus paneles 1–3 ya
+    // se vieron animados (la narrativa arranca en el primero que NO contó);
+    // para un nivel guardado > 1 la narrativa se lee COMPLETA.
+    const data = (this.scene.settings.data ?? {}) as IntroSceneData;
+    wipeTo(this, SceneKey.NARRATIVE, introNarrativePayload(data.levelId));
   }
 
   // ---- Beat 1 — ENTRANCE: Jekyll aparece en su laboratorio --------------------
@@ -686,8 +692,11 @@ export class IntroScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
     });
 
-    // 3) Puffs de niebla teñida estallando alrededor del personaje.
+    // 3) Puffs de niebla teñida estallando alrededor del personaje…
     this.spawnTransformationPuffs();
+    //    …y volutas de humo OSCURO serpenteando hacia arriba (el comic envuelve
+    //    el cuerpo con tentáculos de humo negro, pp. 44–45, 53).
+    this.spawnDarkSmoke();
 
     // 4) Crossfade en espejo Jekyll → Hyde…
     this.tweens.add({
@@ -742,6 +751,60 @@ export class IntroScene extends Phaser.Scene {
         delay: i * puffs.staggerMs,
         duration: puffs.durationMs,
         ease: 'Sine.easeOut',
+      });
+    }
+  }
+
+  /**
+   * Volutas de humo OSCURO que SERPENTEAN subiendo alrededor del personaje
+   * (deterministas: offsets y desfases fijos por índice). Cada voluta sube
+   * desde el cuerpo hasta pasada la cabeza mientras se mece de costado en
+   * yoyo — el «tentáculo» del comic. Todo con tweens (nada de `delayedCall`)
+   * y registrado en `beatFx`: `clearBeatFx` lo mata todo.
+   */
+  private spawnDarkSmoke(): void {
+    const { character } = INTRO_SCENE_LAYOUT;
+    const D = INTRO_TRANSFORMATION.darkPuffs;
+    const k = character.scale;
+    for (let i = 0; i < D.count; i++) {
+      // Reparto determinista alrededor del cuerpo: alterna costados y sube
+      // el punto de origen con el índice (piernas → torso → hombros).
+      const side = i % 2 === 0 ? -1 : 1;
+      const startX = character.x + side * (26 + i * 18) * k;
+      const startY = character.y + (90 - i * 70) * k;
+      const puff = this.add
+        .image(startX, startY, INTRO_TEXTURES.puff)
+        .setScale(D.scale * 0.4)
+        .setAlpha(0)
+        .setTint(hexToNumber(D.color))
+        .setDepth(character.depth + 1);
+      this.beatFx.push(puff);
+      // Subida completa (el serpenteo dura lo mismo que el ascenso).
+      this.tweens.add({
+        targets: puff,
+        y: startY - D.risePx,
+        delay: i * D.staggerMs,
+        duration: D.durationMs,
+        ease: 'Sine.easeOut',
+      });
+      // Serpenteo: mecido horizontal de ida y vuelta alrededor del cuerpo.
+      this.tweens.add({
+        targets: puff,
+        x: startX + side * D.swayPx,
+        delay: i * D.staggerMs,
+        duration: D.durationMs / 2,
+        yoyo: true,
+        repeat: 1,
+        ease: 'Sine.easeInOut',
+      });
+      // Aparece, respira y se disipa dentro de la misma subida (yoyo alfa).
+      this.tweens.add({
+        targets: puff,
+        alpha: { from: 0, to: D.peakAlpha },
+        delay: i * D.staggerMs,
+        duration: D.durationMs / 2,
+        yoyo: true,
+        ease: 'Sine.easeInOut',
       });
     }
   }

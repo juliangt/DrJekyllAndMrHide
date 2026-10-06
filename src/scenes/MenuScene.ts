@@ -9,9 +9,12 @@
  *  - Botones GothicButton desde `menuButtonsFor(save)`: «Comenzar el viaje»,
  *    «Cómo jugar» y «Continuar» SOLO si `save.inProgress` (SPEC §11).
  *    Fase 4 del multi-nivel: «Comenzar» marca `inProgress` + checkpoint 1
- *    (`beginJourney`) y pasa por la INTRO — la cinemática SOLO se ve al
- *    empezar una partida nueva; «Continuar» va DIRECTO a NARRATIVE con
- *    `{ levelId: save.currentLevel }` (sin intro, SPEC §11).
+ *    (`beginJourney`). Fase 5 (v1.1): la INTRO abre TODA sesión — «Comenzar»
+ *    y TAMBIÉN «Continuar» pasan por la cinemática; a la intro se le pasa
+ *    `{ levelId }` (el 1 implícito con «Comenzar», `save.currentLevel` con
+ *    «Continuar») y ella reenvía el destino a NARRATIVE al cerrar. «Continuar»
+ *    NO llama `beginJourney`: es solo de partida nueva (reiniciaría el
+ *    checkpoint al nivel 1, perdiendo el guardado).
  *  - Overlay «Cómo jugar» (3 pasos con iconos procedurales, `HOW_TO_PLAY`)
  *    cerrable con botón «Cerrar».
  *  - Toggle de mute (icono altavoz on/off): persiste vía SaveSystem y
@@ -166,16 +169,20 @@ export class MenuScene extends Phaser.Scene {
       // Fase 4: beginJourney también reinicia el checkpoint al NIVEL 1
       // (partida nueva: descarta el nivel guardado de una tanda anterior).
       beginJourney(saveSystem);
-      // La cinemática (Jekyll → Hyde) SOLO se ve con «Comenzar»: desemboca
-      // en la narrativa del N1, arrancando tras los paneles que ya contó.
+      // La cinemática (Jekyll → Hyde) abre la tanda nueva: desemboca en la
+      // narrativa del N1 (default de la intro), tras los paneles que ya contó.
       transitionTo(this, SceneKey.INTRO);
       return;
     }
     if (id === MenuButtonId.Continue) {
-      // Fase 4: reanudar = narrativa del nivel GUARDADO (`currentLevel`),
-      // SIN reproducir la intro. El quiz fallido (D5) y la pausa no tocan el
-      // checkpoint, así que siempre retoma donde estaba la tanda.
-      transitionTo(this, SceneKey.NARRATIVE, { levelId: saveSystem.currentLevel });
+      // Fase 5 (v1.1): «Continuar» TAMBIÉN pasa por la INTRO — la
+      // transformación se ve al inicio de TODA sesión. La intro recibe el
+      // nivel GUARDADO (`currentLevel`) y es ELLA la que reenvía `{ levelId }`
+      // a NARRATIVE al cerrar (un nivel > 1 no tiene paneles ya contados: su
+      // narrativa se lee completa). beginJourney NO se invoca aquí: es solo
+      // de partida nueva (resetea el checkpoint a 1). El quiz fallido (D5) y
+      // la pausa no tocan el checkpoint: siempre retoma donde estaba la tanda.
+      transitionTo(this, SceneKey.INTRO, { levelId: saveSystem.currentLevel });
       return;
     }
     if (id === MenuButtonId.HowToPlay) {

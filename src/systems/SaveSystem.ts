@@ -32,9 +32,9 @@ export interface SaveData {
   /** Partida empezada y no terminada (habilita «Continuar» en Menu). */
   inProgress: boolean;
   /**
-   * Nivel donde retomar («Continuar» → NARRATIVE {levelId: currentLevel},
-   * sin reproducir la intro). Solo tiene efecto con `inProgress === true`.
-   * Base 1 (default 1: el primer nivel del arco).
+   * Nivel donde retomar («Continuar» → INTRO {levelId: currentLevel}: la
+   * cinemática lo reenvía a NARRATIVE al cerrar). Solo tiene efecto con
+   * `inProgress === true`. Base 1 (default 1: el primer nivel del arco).
    */
   currentLevel: number;
 }

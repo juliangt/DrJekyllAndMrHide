@@ -17,6 +17,11 @@
  * `hasNextLevel`/`nextAfterQuiz` (datos puros contra el registro LEVELS)
  * deciden NARRATIVE {N+1} vs VICTORY; el mapa NEXT_SCENE[QUIZ] queda como
  * fallback final.
+ *
+ * Fase 5 (v1.1) — la intro abre TODA sesión: el grafo NEXT_SCENE no cambia
+ * (MENU → INTRO ya apuntaba a la cinemática), pero ahora TAMBIÉN «Continuar»
+ * lo recorre — la decisión vive en MenuScene y se testa en menu.test.ts; la
+ * intro reenvía `{ levelId, fromIntro }` a NARRATIVE (testeado en intro.test.ts).
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -59,11 +64,11 @@ describe('NEXT_SCENE — cadena principal (SPEC §3)', () => {
     expect(NEXT_SCENE[SceneKey.PRELOAD]).toBe(SceneKey.MENU);
   });
 
-  it('MENU → INTRO (la cinemática solo se ve al salir del menú)', () => {
+  it('MENU → INTRO (la cinemática se ve al salir del menú: «Comenzar» y TAMBIÉN «Continuar» — v1.1)', () => {
     expect(NEXT_SCENE[SceneKey.MENU]).toBe(SceneKey.INTRO);
   });
 
-  it('INTRO → NARRATIVE (fin de la cinemática → narrativa del N1)', () => {
+  it('INTRO → NARRATIVE (fin de la cinemática → narrativa del nivel destino: el payload { levelId, fromIntro } lo decide)', () => {
     expect(NEXT_SCENE[SceneKey.INTRO]).toBe(SceneKey.NARRATIVE);
   });
 
