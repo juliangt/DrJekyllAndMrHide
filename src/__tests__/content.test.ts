@@ -51,6 +51,7 @@ import {
 import { NARRATIVE_SKIP_BUTTON } from '../config/narrative';
 import { ACTION_PAUSE_BUTTON } from '../gameplay/actionLayout';
 import { INTRO_BEATS } from '../config/intro';
+import { EPILOGUE_BEATS } from '../config/epilogue';
 
 // ---- Corpus de TODOS los textos del juego ------------------------------------
 
@@ -163,9 +164,17 @@ function buildCorpus(): readonly { where: string; text: string }[] {
     }
   });
 
+  // Cinemática de cierre (Fase 4 — epílogo): los letreros visibles de cada beat.
+  EPILOGUE_BEATS.forEach((beat, index) => {
+    if (beat.caption.length > 0) {
+      corpus.push({ where: `epílogo: letrero del beat ${index + 1}`, text: beat.caption });
+    }
+  });
+
   corpus.push({ where: 'victoria: titular', text: VICTORY_LABELS.heading });
   corpus.push({ where: 'victoria: botón «Jugar de nuevo»', text: VICTORY_LABELS.playAgain });
   corpus.push({ where: 'victoria: botón «Volver al inicio»', text: VICTORY_LABELS.backToMenu });
+  corpus.push({ where: 'victoria: botón «Ver el final» (epílogo)', text: VICTORY_LABELS.watchEnding });
   corpus.push({ where: 'victoria: placeholder del nombre', text: VICTORY_LABELS.namePlaceholder });
   corpus.push({ where: 'victoria: pista de firma', text: VICTORY_LABELS.nameHint });
   corpus.push({ where: 'victoria: rótulo del Total', text: VICTORY_LABELS.breakdownTotal });

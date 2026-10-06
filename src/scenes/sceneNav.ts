@@ -8,7 +8,8 @@
  * solo importa Phaser como TIPO y los helpers (`transitionTo`, `wipeTo`)
  * se ejercitan con fakes estructurales en tests y en el navegador.
  *
- * Grafo (SPEC §3, Fase 5 del multi-nivel — la intro abre TODA sesión):
+ * Grafo (SPEC §3, Fase 4 del multi-nivel — la intro abre TODA sesión y el
+ * epílogo cierra la obra tras la victoria FINAL):
  *
  *   BOOT → PRELOAD → MENU ─«Comenzar»───────→ INTRO ─┐
  *            └───────«Continuar» (nivel guardado)────┤
@@ -19,14 +20,21 @@
  *                        └─ ✘ (D5)─┘          └─ N era el último → VICTORY
  *                  ACTION ← GAME_OVER (overlay «Reintentar»)
  *
- *   VICTORY (final de la obra, solo tras el nivel 3) → MENU («Volver al
- *   inicio»); «Jugar de nuevo» re-abre NARRATIVE {1} (tanda nueva).
+ *   VICTORY (final de la obra, solo tras el nivel 3) ─«Volver al inicio»─→
+ *   EPILOGUE (cinemática de cierre, comic p. 63) → MENU. «Jugar de nuevo»
+ *   re-abre NARRATIVE {1} (tanda nueva) sin pasar por el epílogo.
  *
  * NOTA — la intro se reproduce en TODA salida del menú hacia el juego (MENU →
  * INTRO, con «Comenzar» o con «Continuar» — v1.1): MenuScene le pasa el nivel
  * de destino y la intro lo reenvía a NARRATIVE al cerrar (`fromIntro` solo
  * para el nivel 1). Las DEMÁS aristas alternativas NO la reproducen — ni el
  * quiz fallido (D5), ni el timeout del minijuego.
+ *
+ * NOTA — el destino de VICTORY es CONDICIONAL: `victoryExitTarget(levelId)`
+ * (abajo) manda a EPILOGUE solo tras la victoria FINAL (sin nivel siguiente
+ * en el registro); una victoria NO final —hoy inalcanzable, `nextAfterQuiz`
+ * solo llega a VICTORY tras el último nivel— iría directo a MENU (arista
+ * defensiva en `ALT_TRANSITIONS`).
  *
  * La salida correcta del quiz es CONDICIONAL (Fase 4): la decide
  * `nextAfterQuiz(levelId)` (abajo), probada contra el registro `LEVELS`.
@@ -50,7 +58,9 @@ import { getLevel } from '../config/levels';
  * `QUIZ` apunta a `VICTORY` como FALLBACK FINAL (el destino real de la
  * salida correcta lo decide `nextAfterQuiz(levelId)`: la narrativa del
  * nivel siguiente si existe — VICTORY solo se alcanza tras el ÚLTIMO nivel).
- * `VICTORY` vuelve a `MENU` («Volver al inicio»).
+ * `VICTORY` conduce al EPILOGUE (cierre de la obra, solo victoria final:
+ * el destino real lo decide `victoryExitTarget(levelId)`), y `EPILOGUE`
+ * vuelve a `MENU`.
  */
 export const NEXT_SCENE: Readonly<Record<SceneKeyType, SceneKeyType>> = {
   [SceneKey.BOOT]: SceneKey.PRELOAD,
@@ -61,7 +71,8 @@ export const NEXT_SCENE: Readonly<Record<SceneKeyType, SceneKeyType>> = {
   [SceneKey.ACTION]: SceneKey.QUIZ, // meta 3/3 alcanzada
   [SceneKey.GAME_OVER]: SceneKey.ACTION, // «Reintentar»: SOLO el minijuego
   [SceneKey.QUIZ]: SceneKey.VICTORY, // correcta: fallback final (vía nextAfterQuiz)
-  [SceneKey.VICTORY]: SceneKey.MENU, // «Volver al inicio» / rejugar
+  [SceneKey.VICTORY]: SceneKey.EPILOGUE, // «Volver al inicio» tras la victoria FINAL (vía victoryExitTarget)
+  [SceneKey.EPILOGUE]: SceneKey.MENU, // fin de la cinemática de cierre
 };
 
 /** Salidas alternativas (aristas condicionales) del grafo del flujo. */
@@ -70,6 +81,12 @@ export const ALT_TRANSITIONS = {
   quizWrong: { from: SceneKey.QUIZ, to: SceneKey.NARRATIVE },
   /** Timeout del minijuego → overlay GAME_OVER (dentro de ActionScene). */
   actionTimeout: { from: SceneKey.ACTION, to: SceneKey.GAME_OVER },
+  /**
+   * Victoria NO final → MENU directamente (SIN epílogo). Hoy es una arista
+   * DEFENSIVA: `nextAfterQuiz` solo deriva a VICTORY tras el ÚLTIMO nivel,
+   * así que en la práctica toda victoria es final.
+   */
+  victoryEarlyLevels: { from: SceneKey.VICTORY, to: SceneKey.MENU },
 } as const satisfies Record<string, { from: SceneKeyType; to: SceneKeyType }>;
 
 // ---- Progresión multi-nivel (Fase 4, datos puros contra el registro) --------
@@ -92,6 +109,18 @@ export function hasNextLevel(levelId: number): boolean {
  */
 export function nextAfterQuiz(levelId: number): SceneKeyType {
   return hasNextLevel(levelId) ? SceneKey.NARRATIVE : SceneKey.VICTORY;
+}
+
+/**
+ * Destino del botón «Volver al inicio» de VICTORY (Fase 4 — epílogo): SOLO
+ * si la victoria es FINAL (no hay nivel siguiente en el registro) la salida
+ * pasa por el EPILOGUE — la cinemática de cierre (comic p. 63) — y de ahí a
+ * MENU; una victoria NO final (arista defensiva, hoy inalcanzable) iría
+ * directo a MENU. Los niveles 1 y 2 del registro JAMÁS derivan a VICTORY
+ * (los decide `nextAfterQuiz`), así que su flujo queda intacto.
+ */
+export function victoryExitTarget(levelId: number): SceneKeyType {
+  return hasNextLevel(levelId) ? SceneKey.MENU : SceneKey.EPILOGUE;
 }
 
 /** Siguiente escena de la cadena principal (útil para no exponer el mapa). */

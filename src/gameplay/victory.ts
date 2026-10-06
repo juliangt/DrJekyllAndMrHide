@@ -227,6 +227,8 @@ export const VICTORY_LABELS = {
   heading: '¡Victoria!',
   playAgain: 'Jugar de nuevo',
   backToMenu: 'Volver al inicio',
+  /** Victoria FINAL: ese mismo botón abre el epílogo animado (comic p. 63). */
+  watchEnding: 'Ver el final',
   namePlaceholder: 'Tu nombre',
   nameHint: 'Toca tu nombre en el diploma para firmarlo',
   breakdownTotal: 'Total',

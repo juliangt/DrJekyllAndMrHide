@@ -3,10 +3,11 @@
  * (mobile-first vertical), `Scale.FIT` + `CENTER_BOTH` y fondo de noche de
  * la paleta. `src/main.ts` consume esta config (nada de config inline).
  *
- * Escenas registradas (SPEC §3 / §10.2): las 8 del flujo con archivo propio,
- * EN ORDEN de arranque. La 9ª clave del flujo, `SceneKey.GAME_OVER`, NO se
- * registra aquí porque es un overlay dentro de `ActionScene` (ver
- * `sceneKeys.ts`).
+ * Escenas registradas (SPEC §3 / §10.2): las 9 del flujo con archivo propio,
+ * EN ORDEN de arranque. Las claves `SceneKey.GAME_OVER` y `SceneKey.EPILOGUE`
+ * del flujo: la primera NO se registra aquí porque es un overlay dentro de
+ * `ActionScene`; la segunda es la cinemática de cierre (`EpilogueScene`,
+ * solo victoria final) y SÍ tiene archivo propio (ver `sceneKeys.ts`).
  *
  * `SceneKey` se define en `sceneKeys.ts` (módulo aparte, libre de Phaser y
  * del ciclo escenas↔config) y se re-exporta aquí por conveniencia.
@@ -16,6 +17,7 @@ import { BASE_HEIGHT, BASE_WIDTH } from './dimensions';
 import { nightBackground } from './palette';
 import { ActionScene } from '../scenes/ActionScene';
 import { BootScene } from '../scenes/BootScene';
+import { EpilogueScene } from '../scenes/EpilogueScene';
 import { IntroScene } from '../scenes/IntroScene';
 import { MenuScene } from '../scenes/MenuScene';
 import { NarrativeScene } from '../scenes/NarrativeScene';
@@ -28,7 +30,7 @@ import { VictoryScene } from '../scenes/VictoryScene';
 // `verbatimModuleSyntax` — quien necesite el tipo importa de sceneKeys.)
 export { SceneKey } from './sceneKeys';
 
-/** Registro de escenas en orden del flujo BOOT → … → VICTORY (SPEC §3). */
+/** Registro de escenas en orden del flujo BOOT → … → VICTORY → EPILOGUE (SPEC §3). */
 export const SCENES: Phaser.Types.Scenes.SceneType[] = [
   BootScene, // SceneKey.BOOT
   PreloadScene, // SceneKey.PRELOAD
@@ -37,7 +39,8 @@ export const SCENES: Phaser.Types.Scenes.SceneType[] = [
   NarrativeScene, // SceneKey.NARRATIVE
   ActionScene, // SceneKey.ACTION (contiene el overlay GAME_OVER)
   QuizScene, // SceneKey.QUIZ
-  VictoryScene, // SceneKey.VICTORY
+  VictoryScene, // SceneKey.VICTORY (diploma)
+  EpilogueScene, // SceneKey.EPILOGUE (cierre de la obra: solo victoria final)
 ];
 
 /** Config completa de `new Phaser.Game(gameConfig)` (ver `src/main.ts`). */

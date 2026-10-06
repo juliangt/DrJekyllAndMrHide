@@ -131,31 +131,32 @@ describe('DoD 2 — responsive 320→1920 verificado (táctil y mouse)', () => {
 // ---------------------------------------------------------------------------
 
 describe('DoD 3 — flujo completo jugable (grafo de escenas)', () => {
-  it('el mapa de navegación cubre las 9 claves del flujo (SPEC §3 + intro pre-nivel)', () => {
+  it('el mapa de navegación cubre las 10 claves del flujo (SPEC §3 + intro pre-nivel + epílogo)', () => {
     const keys = Object.keys(NEXT_SCENE);
-    expect(keys.length).toBe(9);
+    expect(keys.length).toBe(10);
     for (const key of Object.values(SceneKey)) {
       expect(keys, `falta la escena ${key}`).toContain(key);
     }
   });
 
-  it('la cadena principal conecta BOOT → … → VICTORY → MENU (con la intro)', () => {
+  it('la cadena principal conecta BOOT → … → VICTORY → EPILOGUE → MENU (con la intro)', () => {
     const chain: string[] = [SceneKey.BOOT];
     let cursor: SceneKey = SceneKey.BOOT;
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < 10; i++) {
       cursor = nextSceneKey(cursor);
       chain.push(cursor);
-      if (cursor === SceneKey.MENU && i >= 6) break; // vuelta a menú tras ganar
+      if (cursor === SceneKey.MENU && i >= 7) break; // vuelta a menú tras el epílogo
     }
     expect(chain).toEqual([
       SceneKey.BOOT, SceneKey.PRELOAD, SceneKey.MENU, SceneKey.INTRO,
-      SceneKey.NARRATIVE, SceneKey.ACTION, SceneKey.QUIZ, SceneKey.VICTORY, SceneKey.MENU,
+      SceneKey.NARRATIVE, SceneKey.ACTION, SceneKey.QUIZ, SceneKey.VICTORY,
+      SceneKey.EPILOGUE, SceneKey.MENU,
     ]);
   });
 
-  it('las 8 escenas del flujo están registradas EN ORDEN en game.config', () => {
+  it('las 9 escenas del flujo están registradas EN ORDEN en game.config', () => {
     const source = readSource('src/config/game.config.ts');
-    const order = ['BootScene', 'PreloadScene', 'MenuScene', 'IntroScene', 'NarrativeScene', 'ActionScene', 'QuizScene', 'VictoryScene'];
+    const order = ['BootScene', 'PreloadScene', 'MenuScene', 'IntroScene', 'NarrativeScene', 'ActionScene', 'QuizScene', 'VictoryScene', 'EpilogueScene'];
     let last = -1;
     for (const name of order) {
       const at = source.indexOf(name, last + 1);

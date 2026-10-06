@@ -99,9 +99,13 @@ describe('VictoryScene — botones del PLAN (rejugar / inicio)', () => {
     expect(source).toContain('markLevelComplete(finalScore, this.level.id)');
   });
 
-  it('«Volver al inicio»: transición a MENU (sin «Continuar» tras ganar, SPEC §6/§11)', () => {
+  it('«Volver al inicio» (Fase 4 — epílogo): victoryExitTarget(level.id) decide MENU vs EPILOGUE', () => {
     const menuBlock = source.slice(source.indexOf('private onBackToMenu('));
-    expect(menuBlock.indexOf('transitionTo(this, SceneKey.MENU)')).toBeGreaterThan(-1);
+    // La decisión vive en la función PURA `victoryExitTarget` (sceneNav,
+    // testeada en epilogue.test.ts): SOLO la victoria FINAL (nivel 3) pasa
+    // por la cinemática de cierre; el MENU sigue siendo el destino final.
+    expect(menuBlock.indexOf('transitionTo(this, victoryExitTarget(this.level.id))')).toBeGreaterThan(-1);
+    expect(menuBlock.indexOf('transitionTo(this, SceneKey.MENU)')).toBe(-1);
   });
 
   it('guard `exiting` anti doble-tap en ambas salidas', () => {

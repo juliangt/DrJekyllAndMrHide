@@ -1,7 +1,7 @@
 /**
  * Claves de las escenas del flujo (SPEC §3).
  *
- * NUEVE estados en el flujo, pero SOLO OCHO archivos de escena (SPEC §10.2):
+ * DIEZ estados en el flujo, pero SOLO NUEVE archivos de escena (SPEC §10.2):
  * `GAME_OVER` NO tiene escena propia — es un OVERLAY dibujado dentro de
  * `ActionScene` cuando el timer llega a cero (SPEC §3: «timeout → GAME_OVER
  * → reintentar ACTION»). Su clave existe aquí porque el mapa de navegación
@@ -10,6 +10,11 @@
  * `INTRO` es la cinemática que corre ANTES de la narrativa (el Dr. Jekyll
  * se transforma en Mr. Hyde): se ve al salir del menú (MENU → INTRO), tanto
  * con «Comenzar el viaje» como con «Continuar» (v1.1: abre TODA sesión).
+ *
+ * `EPILOGUE` es la cinemática de CIERRE de la obra (comic p. 63): se ve SOLO
+ * al ganar el NIVEL 3 — tras el diploma, «Volver al inicio» conduce a la
+ * aparición de Hyde DETRÁS de Utterson y de ahí a MENU (`victoryExitTarget`
+ * en `sceneNav.ts`; una victoria NO final —hoy inalcanzable— iría a MENU).
  *
  * NOTA — «enum»: `tsconfig` usa `erasableSyntaxOnly: true`, que prohíbe los
  * `enum` de TypeScript (generan código en runtime). Este objeto `const` +
@@ -38,9 +43,11 @@ export const SceneKey = {
   GAME_OVER: 'GameOver',
   /** Quiz literario. ✔ → VICTORY · ✘ → reinicio de nivel → NARRATIVE. */
   QUIZ: 'Quiz',
-  /** Diploma + resumen de puntaje. → MENU. */
+  /** Diploma + resumen de puntaje. → EPILOGUE (final) o MENU. */
   VICTORY: 'Victory',
+  /** Cinemática de cierre (solo victoria final): Hyde emerge tras Utterson. → MENU. */
+  EPILOGUE: 'Epilogue',
 } as const;
 
-/** Unión de las 9 claves de escena (usar como tipo en firmas y mapas). */
+/** Unión de las 10 claves de escena (usar como tipo en firmas y mapas). */
 export type SceneKey = (typeof SceneKey)[keyof typeof SceneKey];

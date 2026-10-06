@@ -42,10 +42,21 @@ import { SceneKey } from '../config/sceneKeys';
 import { TEXTURE_KEYS } from '../art/textures';
 import { LEVELS } from '../config/levels';
 
-describe('SceneKey — las 9 claves del flujo (SPEC §3 + intro pre-nivel)', () => {
-  it('tiene exactamente BOOT, PRELOAD, MENU, INTRO, NARRATIVE, ACTION, GAME_OVER, QUIZ, VICTORY', () => {
+describe('SceneKey — las 10 claves del flujo (SPEC §3 + intro pre-nivel + epílogo)', () => {
+  it('tiene exactamente BOOT, PRELOAD, MENU, INTRO, NARRATIVE, ACTION, GAME_OVER, QUIZ, VICTORY, EPILOGUE', () => {
     expect(Object.keys(SceneKey).sort()).toEqual(
-      ['ACTION', 'BOOT', 'GAME_OVER', 'INTRO', 'MENU', 'NARRATIVE', 'PRELOAD', 'QUIZ', 'VICTORY'].sort(),
+      [
+        'ACTION',
+        'BOOT',
+        'EPILOGUE',
+        'GAME_OVER',
+        'INTRO',
+        'MENU',
+        'NARRATIVE',
+        'PRELOAD',
+        'QUIZ',
+        'VICTORY',
+      ].sort(),
     );
   });
 
@@ -86,8 +97,12 @@ describe('NEXT_SCENE — cadena principal (SPEC §3)', () => {
     expect(NEXT_SCENE[SceneKey.QUIZ]).toBe(SceneKey.VICTORY);
   });
 
-  it('VICTORY («Volver al inicio») → MENU', () => {
-    expect(NEXT_SCENE[SceneKey.VICTORY]).toBe(SceneKey.MENU);
+  it('VICTORY («Volver al inicio») → EPILOGUE: tras la victoria FINAL el cierre pasa por la cinemática (el destino real lo decide victoryExitTarget)', () => {
+    expect(NEXT_SCENE[SceneKey.VICTORY]).toBe(SceneKey.EPILOGUE);
+  });
+
+  it('EPILOGUE (fin de la cinemática de cierre) → MENU', () => {
+    expect(NEXT_SCENE[SceneKey.EPILOGUE]).toBe(SceneKey.MENU);
   });
 
   it('GAME_OVER («Reintentar») → ACTION (solo el minijuego, D6)', () => {
@@ -451,7 +466,7 @@ describe('wipeTo — fade + cortina de niebla (con fakes)', () => {
 describe('game.config.ts — registro de escenas y escala (leído como fuente)', () => {
   const source = readFileSync(resolve(process.cwd(), 'src/config/game.config.ts'), 'utf8');
 
-  it('registra las 8 escenas con archivo (SPEC §10.2 + intro), en orden del flujo', () => {
+  it('registra las 9 escenas con archivo (SPEC §10.2 + intro + epílogo), en orden del flujo', () => {
     const scenesBlock = source.slice(
       source.indexOf('export const SCENES'),
       source.indexOf('];', source.indexOf('export const SCENES')),
@@ -465,6 +480,7 @@ describe('game.config.ts — registro de escenas y escala (leído como fuente)',
       'ActionScene',
       'QuizScene',
       'VictoryScene',
+      'EpilogueScene',
     ];
     let cursor = -1;
     for (const sceneClass of expected) {

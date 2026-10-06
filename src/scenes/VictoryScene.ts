@@ -28,7 +28,11 @@
  *  - «Jugar de nuevo»: resetea la TANDA (total + desglose por categorías),
  *    reinicia el checkpoint al NIVEL 1 (`setCurrentLevel(1)`) y vuelve a
  *    NARRATIVE {levelId: 1} — el récord vive en el save y se conserva.
- *    «Volver al inicio»: transición a MENU.
+ *  - «Volver al inicio» (Fase 4 — epílogo): el destino lo decide
+ *    `victoryExitTarget(levelId)` — SOLO tras la victoria FINAL (el nivel 3)
+ *    pasa por la cinemática de cierre (EPILOGUE, comic p. 63) y de ahí a
+ *    MENU; una victoria NO final (defensiva, hoy inalcanzable) iría directo
+ *    a MENU. El save ya quedó marcado al entrar en ambos casos.
  *  - Sonido de entrada: arpegio mayor del AudioSystem (SPEC §8, suficiente
  *    como fanfarria corta; no-op si el audio está bloqueado o en mute).
  */
@@ -45,7 +49,7 @@ import type { SaveSystem } from '../systems/SaveSystem';
 import type { ScoreSystem } from '../systems/ScoreSystem';
 import type { LevelConfig } from '../config/levels/types';
 import { FIRST_LEVEL_ID } from '../config/levels';
-import { fadeIn, transitionTo } from './sceneNav';
+import { fadeIn, transitionTo, victoryExitTarget } from './sceneNav';
 import { Modal } from '../ui/Modal';
 import { GothicButton } from '../ui/GothicButton';
 import { NameField } from '../ui/nameField';
@@ -426,7 +430,11 @@ export class VictoryScene extends Phaser.Scene {
     }).setDepth(layout.depths.ui);
 
     new GothicButton(this, layout.panel.centerX, layout.buttons.menuCenterY, {
-      label: VICTORY_LABELS.backToMenu,
+      // Victoria final: el botón abre el EPÍLOGO animado, no el menú.
+      label:
+        victoryExitTarget(this.level.id) === SceneKey.EPILOGUE
+          ? VICTORY_LABELS.watchEnding
+          : VICTORY_LABELS.backToMenu,
       layout: VICTORY_BUTTON,
       onPress: (): void => this.onBackToMenu(),
     }).setDepth(layout.depths.ui);
@@ -449,14 +457,18 @@ export class VictoryScene extends Phaser.Scene {
   }
 
   /**
-   * «Volver al inicio»: el save ya quedó marcado al entrar (Completed = 1,
-   * inProgress = false) — MENU no mostrará «Continuar» (SPEC §6/§11).
+   * «Volver al inicio» (Fase 4 — epílogo): el save ya quedó marcado al
+   * entrar (Completed = 1, inProgress = false) — MENU no mostrará
+   * «Continuar» tras ganar (SPEC §6/§11). Tras la victoria FINAL (sin nivel
+   * siguiente en el registro) la salida pasa por el EPILOGUE (cierre de la
+   * obra, comic p. 63); una victoria NO final iría directo a MENU
+   * (`victoryExitTarget`, arista defensiva). Sin tocar tanda ni score.
    */
   private onBackToMenu(): void {
     if (this.exiting) {
       return;
     }
     this.exiting = true;
-    transitionTo(this, SceneKey.MENU);
+    transitionTo(this, victoryExitTarget(this.level.id));
   }
 }

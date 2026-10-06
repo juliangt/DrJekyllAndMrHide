@@ -60,8 +60,8 @@ Decisiones cerradas con el solicitante (y diferencias respecto al pedido origina
 Máquina de estados (herencia conceptual de `start.md`) **mapeada 1:1 a escenas Phaser**:
 
 ```
-BOOT ──► PRELOAD ──► MENU ──► INTRO ──► NARRATIVE ──► ACTION ──► QUIZ ──► VICTORY
-                       ▲        │           │            │            │
+BOOT ──► PRELOAD ──► MENU ──► INTRO ──► NARRATIVE ──► ACTION ──► QUIZ ──► VICTORY ──► EPILOGUE ──► MENU
+                       ▲        │           │            │            │                      (solo victoria final)
                        │        │           │            │            ├─ ✔ correcta → VICTORY
                        │        │           │            │            └─ ✘ incorrecta → reinicio de NIVEL
                        │        │           │          └── timeout ──► GAME_OVER ──► reintentar ACTION
@@ -78,8 +78,9 @@ BOOT ──► PRELOAD ──► MENU ──► INTRO ──► NARRATIVE ──
 | `NARRATIVE` | Viñeta del nivel (paneles de texto + arte de fondo), avance por tap. | → `ACTION` |
 | `ACTION` | Minijuego arcade del nivel (§4.2). | meta → `QUIZ` · timeout → `GAME_OVER` |
 | `GAME_OVER` | Overlay animoso: «La niebla lo ocultó todo… ¡inténtalo de nuevo!». **No es fin de partida.** | → reintentar `ACTION` (mismo nivel) |
-| `QUIZ` | Modal de evaluación literaria (§4.3). | ✔ → `VICTORY` (v1, único nivel) · ✘ → reinicio de nivel → `NARRATIVE` |
-| `VICTORY` | Diploma + resumen de puntaje. Reset de progreso / rejugar. | → `MENU` |
+| `QUIZ` | Modal de evaluación literaria (§4.3). | ✔ → `VICTORY` (solo tras el ÚLTIMO nivel, `nextAfterQuiz`) · ✘ → reinicio de nivel → `NARRATIVE` |
+| `VICTORY` | Diploma + resumen de puntaje. Reset de progreso / rejugar. | «Volver al inicio» → `EPILOGUE` (victoria final, `victoryExitTarget`) · «Jugar de nuevo» → `NARRATIVE {1}` |
+| `EPILOGUE` | Cinemática de cierre (v. p. 63 del comic, solo victoria final): Utterson lee la confesión, la niebla crece y la cara GIGANTE de Hyde emerge DETRÁS de él — amenaza sugerida, sin contacto (D4) — y cierra la cartela «Nadie sabrá nunca el secreto…». Avance por tap; «Saltar» disponible. | fin o «Saltar» → `MENU` |
 
 **Regla de reinicio de nivel (D5):** al fallar el quiz se muestra el feedback pedagógico, se
 **descartan los puntos ganados en esa tanda del nivel** y el flujo vuelve a `NARRATIVE`
@@ -190,7 +191,8 @@ Redacción definitiva a pulir en implementación.
 | **Acción (N1)** | HUD superior: contador «Sustos causados: X/3», timer (barra + segundos), puntaje; botón pausa (vuelve a Menu guardando progreso de nivel) | Timer en rojo y con *tick* en los últimos 5 s |
 | **Quiz** | Modal centrado tipo pergamino/cartas antiguas: pregunta, 4 opciones (A–D) como tarjetas, feedback inline | Opciones ≥ 56 px de alto; nunca se cierra sin feedback |
 | **GAME_OVER (timeout)** | Overlay: «La niebla lo ocultó todo… ¡inténtalo de nuevo!» + botón «Reintentar» | Tono animoso; sin «perdiste» en rojo agresivo |
-| **Victoria** | Diploma generado (nombre del jugador opcional vía input simple), puntaje final desglosado (taps + quiz + bonus), botones «Jugar de nuevo» y «Volver al inicio» | Reset de progreso al rejugar |
+| **Victoria** | Diploma generado (nombre del jugador opcional vía input simple), puntaje final desglosado (taps + quiz + bonus), botones «Jugar de nuevo» y «Volver al inicio» | Reset de progreso al rejugar; tras la victoria FINAL «Volver al inicio» pasa por el `Epilogue` |
+| **Epílogo (cinemática de cierre)** | El estudio de Utterson de noche: la confesión llega a su final («Pobre Henry»), la niebla crece y la cara GIGANTE de Hyde emerge DETRÁS de él (sin contacto, D4) hasta la cartela final del comic; letreros por beat | Tap avanza; botón «Saltar» ≥ 64 px; solo se ve al ganar el nivel 3 (`victoryExitTarget`) |
 
 ---
 
@@ -297,6 +299,7 @@ src/
 │   ├── palette.ts              # colores (§7.1)
 │   ├── game.config.ts          # Phaser config (scale FIT, scenes)
 │   ├── intro.ts                # datos de la cinemática de introducción (beats, captions, timings)
+│   ├── epilogue.ts             # datos de la cinemática de cierre (epílogo, solo victoria final)
 │   └── levels/
 │       ├── types.ts            # LevelConfig, ActionConfig, QuizConfig, LorePanel
 │       ├── level1.ts           # TODO el contenido del Nivel 1 como DATOS
@@ -309,7 +312,8 @@ src/
 │   ├── NarrativeScene.ts       # genérica: renderiza el lore del LevelConfig
 │   ├── ActionScene.ts          # genérica: ejecuta el ActionConfig del nivel
 │   ├── QuizScene.ts            # genérica: renderiza el QuizConfig
-│   └── VictoryScene.ts
+│   ├── VictoryScene.ts
+│   └── EpilogueScene.ts        # cinemática de cierre: Hyde emerge tras Utterson (solo victoria final)
 ├── systems/
 │   ├── SaveSystem.ts           # localStorage (§11)
 │   ├── AudioSystem.ts          # Web Audio sintetizado (§8) + mute
