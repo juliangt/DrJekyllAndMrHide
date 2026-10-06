@@ -163,6 +163,16 @@ describe('ActionScene — feedback del tap (SPEC §4.2/§7.2)', () => {
     expect(hitBlock.indexOf('audioSystem.blip(')).toBeGreaterThan(-1);
   });
 
+  it('REGRESIÓN: la entrada a `falling` llega por INPUT (entre frames) y la caída arranca en onHit', () => {
+    // El watcher de update() compara contra el INICIO del frame: si el golpe
+    // de meta entra a `falling` desde onPointerDown, previousPhase ya es
+    // 'falling' y el watcher nunca dispara. onHit debe detectarlo él mismo
+    // (como ya hace con 'goal') y llamar a playFall() sin esperar un tick.
+    const hitBlock = source.slice(source.indexOf('private onHit('), source.indexOf('private onJekyllTap('));
+    expect(hitBlock).toContain("previousPhase !== 'falling'");
+    expect(hitBlock).toContain('this.playFall()');
+  });
+
   it('miss: puff de niebla + noise suave, SIN castigo (no toca el reducer)', () => {
     const start = source.indexOf('private onMiss(');
     const missBlock = source.slice(start, source.indexOf('// ---- Finales de tanda'));

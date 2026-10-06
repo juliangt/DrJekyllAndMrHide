@@ -803,6 +803,12 @@ export class ActionScene extends Phaser.Scene {
       this.onGoal();
       return;
     }
+    if (this.state.phase === 'falling' && previousPhase !== 'falling') {
+      // La entrada a `falling` llega por INPUT (golpe de meta entre frames),
+      // no por tick: el watcher de update() no la ve (su previousPhase ya es
+      // 'falling'). La caída arranca AQUÍ (el guard de playFall hace el resto).
+      this.playFall();
+    }
     if (this.mechanic === 'tap-target') {
       // «Sale corriendo asustada pero ilesa»: mini-estallido + reaparición.
       this.scareGirl();
