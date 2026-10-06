@@ -56,8 +56,8 @@ function makeRecordingGraphics(): { g: Parameters<TextureDef['draw']>[0]; calls:
 const PALETTE_NUMBERS = new Set<number>(Object.values(PALETTE).map((hex) => hexToNumber(hex)));
 
 describe('TEXTURE_DEFS — invariants del registro', () => {
-  it('tiene las 19 texturas (hornadas 1 + 2 + 3 + 4 + 5 + intro + navegación + cielo)', () => {
-    expect(TEXTURE_DEFS.length).toBe(19);
+  it('tiene las 24 texturas (hornadas 1 + 2 + 3 + 4 + 5 + intro + navegación + cielo + niveles 2/3)', () => {
+    expect(TEXTURE_DEFS.length).toBe(24);
   });
 
   it('claves únicas', () => {
@@ -149,9 +149,34 @@ describe('TEXTURE_DEFS — invariants del registro', () => {
 
   it('la 7ª hornada (navegación y cielo): la flecha del costado y la estrella', () => {
     const keys = TEXTURE_DEFS.map((def) => def.key);
-    expect(keys.slice(17)).toEqual([TEXTURE_KEYS.arrow, TEXTURE_KEYS.star]);
+    expect(keys.slice(17, 19)).toEqual([TEXTURE_KEYS.arrow, TEXTURE_KEYS.star]);
     expect(TEXTURE_KEYS.arrow).toBe('arrow');
     expect(TEXTURE_KEYS.star).toBe('star');
+  });
+
+  it('la 8ª hornada (niveles 2 y 3): Lanyon, bastón, Poole, Utterson y puerta del lab', () => {
+    const keys = TEXTURE_DEFS.map((def) => def.key);
+    // Las texturas nuevas se añadieron AL FINAL del registro (los slices por
+    // índice de las hornadas 1–7 siguen intactos).
+    expect(keys.slice(19)).toEqual([
+      TEXTURE_KEYS.lanyon,
+      TEXTURE_KEYS.cane,
+      TEXTURE_KEYS.poole,
+      TEXTURE_KEYS.utterson,
+      TEXTURE_KEYS.labDoor,
+    ]);
+    // Las claves planificadas por la Fase 1 (level2.ts) se respetan EXACTOS.
+    expect(TEXTURE_KEYS.lanyon).toBe('lanyon');
+    expect(TEXTURE_KEYS.cane).toBe('cane');
+    expect(TEXTURE_KEYS.poole).toBe('poole');
+    expect(TEXTURE_KEYS.utterson).toBe('utterson');
+    expect(TEXTURE_KEYS.labDoor).toBe('lab-door');
+  });
+
+  it('las claves del N2 coinciden con las planificadas en level2.ts', async () => {
+    const { LANYON_TEXTURE_KEY, CANE_TEXTURE_KEY } = await import('../config/levels/level2');
+    expect(TEXTURE_KEYS.lanyon).toBe(LANYON_TEXTURE_KEY);
+    expect(TEXTURE_KEYS.cane).toBe(CANE_TEXTURE_KEY);
   });
 });
 
@@ -447,6 +472,142 @@ describe('TEXTURE_DEFS — dibujos con Graphics de grabación', () => {
       calls.some(
         (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.error),
       ),
+    ).toBe(false);
+  });
+
+  it('lanyon (N2): copa alta, barba, faldones, bastón propio y reloj de latón', () => {
+    const def = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.lanyon);
+    expect(def).toBeDefined();
+    const { g, calls } = makeRecordingGraphics();
+    def?.draw(g);
+    // Silueta oscura de buildings (como los edificios del callejón).
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.buildings),
+      ),
+    ).toBe(true);
+    // Barba y faldones: triángulos; bastón y torso: rects.
+    expect(calls.filter((c) => c.method === 'fillTriangle').length).toBeGreaterThanOrEqual(4);
+    expect(calls.filter((c) => c.method === 'fillRect').length).toBeGreaterThanOrEqual(10);
+    // El acento cálido es el reloj de latón: doble halo + núcleo de lampFire.
+    expect(
+      calls.filter((c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.lampFire))
+        .length,
+    ).toBeGreaterThanOrEqual(3);
+    // Proporción de adulto comparable a jekyll: alto ≥ 200.
+    expect(def?.height).toBeGreaterThanOrEqual(200);
+  });
+
+  it('cane (N2): mango blanco legible, aro de latón y vara oscura afinada', () => {
+    const def = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.cane);
+    expect(def).toBeDefined();
+    const { g, calls } = makeRecordingGraphics();
+    def?.draw(g);
+    // El MANGO BLANCO (pedido explícito): relleno y doble halo pergamino claro.
+    expect(
+      calls.filter(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.parchmentLight),
+      ).length,
+    ).toBeGreaterThanOrEqual(3);
+    // El latón aparece en la unión (aro) y en la férula de la punta.
+    expect(
+      calls.filter((c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.lampFire))
+        .length,
+    ).toBeGreaterThanOrEqual(1);
+    // La vara oscura se afina en DOS tramos + mango/halo: ≥ 4 rects totales.
+    expect(calls.filter((c) => c.method === 'fillRect').length).toBeGreaterThanOrEqual(4);
+    // Horizontal: más ancho que alto (la escena lo esgrima/gira).
+    expect(def?.width).toBeGreaterThan((def?.height ?? 0) * 2);
+  });
+
+  it('poole (N3): librea con botones pálidos y brazo en alto golpeando', () => {
+    const def = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.poole);
+    expect(def).toBeDefined();
+    const { g, calls } = makeRecordingGraphics();
+    def?.draw(g);
+    // Chaleco de librea (street) sobre la silueta de buildings.
+    expect(
+      calls.some((c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.street)),
+    ).toBe(true);
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.buildings),
+      ),
+    ).toBe(true);
+    // Botones pálidos del chaleco: al menos 4 rects de pergamino claro.
+    const paleCalls = calls.filter(
+      (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.parchmentLight),
+    );
+    expect(paleCalls.length).toBeGreaterThanOrEqual(2);
+    expect(calls.filter((c) => c.method === 'fillRect').length).toBeGreaterThanOrEqual(10);
+    // Brazo en alto: puño (círculo) + chispas del golpe en fuego de farola.
+    expect(calls.some((c) => c.method === 'fillCircle')).toBe(true);
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.lampFire),
+      ),
+    ).toBe(true);
+    // Sin sangre (10+).
+    expect(
+      calls.some((c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.error)),
+    ).toBe(false);
+  });
+
+  it('utterson (N3): abrigo corpulento, bufanda pálida y bastón apoyado', () => {
+    const def = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.utterson);
+    expect(def).toBeDefined();
+    const { g, calls } = makeRecordingGraphics();
+    def?.draw(g);
+    // Abrigo pesado: trapecio (2 triángulos) + ruedo.
+    expect(calls.filter((c) => c.method === 'fillTriangle').length).toBeGreaterThanOrEqual(2);
+    expect(calls.filter((c) => c.method === 'fillRect').length).toBeGreaterThanOrEqual(6);
+    // Bufanda pálida (el acento que lo distingue de la noche).
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.parchmentLight),
+      ),
+    ).toBe(true);
+    // Bastón apoyado: trazo diagonal con strokePath + férula (círculo).
+    expect(calls.some((c) => c.method === 'strokePath')).toBe(true);
+    expect(calls.some((c) => c.method === 'fillCircle')).toBe(true);
+  });
+
+  it('labDoor (N3): roble con paneles, marco de piedra, pomo de latón y golpes', () => {
+    const def = TEXTURE_DEFS.find((d) => d.key === TEXTURE_KEYS.labDoor);
+    expect(def).toBeDefined();
+    const { g, calls } = makeRecordingGraphics();
+    def?.draw(g);
+    // Dos paneles hundidos (rounded rects) con luz en el canto.
+    expect(calls.filter((c) => c.method === 'fillRoundedRect').length).toBe(2);
+    // Pomo de latón: doble halo + núcleo + placa (≥ 4 usos de lampFire).
+    expect(
+      calls.filter((c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.lampFire))
+        .length,
+    ).toBeGreaterThanOrEqual(4);
+    // Piedra: muro (buildings) y juntas/marco (street).
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.buildings),
+      ),
+    ).toBe(true);
+    expect(
+      calls.some((c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.street)),
+    ).toBe(true);
+    // La hoja de roble es el marrón cálido de la paleta (parchmentDark).
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.parchmentDark),
+      ),
+    ).toBe(true);
+    // Marcas de golpes: muescas pálidas (pergamino claro en alfa).
+    expect(
+      calls.some(
+        (c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.parchmentLight),
+      ),
+    ).toBe(true);
+    // Sin sangre (10+).
+    expect(
+      calls.some((c) => c.method === 'fillStyle' && c.args[0] === hexToNumber(PALETTE.error)),
     ).toBe(false);
   });
 });

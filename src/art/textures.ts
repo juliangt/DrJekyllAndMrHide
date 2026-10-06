@@ -88,6 +88,18 @@ export const TEXTURE_KEYS = {
   arrow: 'arrow',
   /** Estrella del cielo nocturno (destello de 4 puntas, titila en runtime). */
   star: 'star',
+  // --- Fase 2 (PLAN): personajes y props de los niveles 2 y 3 ---
+
+  /** El Dr. Lanyon: médico victoriano distinguido (objetivo del Nivel 2). */
+  lanyon: 'lanyon',
+  /** El bastón de MANGO BLANCO del Nivel 2 (mecánica «cane-strike»). */
+  cane: 'cane',
+  /** Poole el mayordomo: golpea la puerta del laboratorio (Nivel 3). */
+  poole: 'poole',
+  /** El abogado Utterson: corpulento, abrigo pesado y bastón (Nivel 3). */
+  utterson: 'utterson',
+  /** Puerta pesada del laboratorio: roble cerrado en marco de piedra (N3). */
+  labDoor: 'lab-door',
 } as const;
 
 /**
@@ -735,12 +747,356 @@ function drawArrow(g: Phaser.GameObjects.Graphics): void {
   g.fillTriangle(16, 24, 44, 48, 16, 72);
 }
 
+// ---- Texturas de la Fase 2 (personajes y props de los niveles 2 y 3) --------
+
+/**
+ * El Dr. Lanyon (objetivo del Nivel 2): médico distinguido VICTORIANO en
+ * silueta oscura (buildings, como los edificios del callejón) con detalles
+ * que lo separan de Jekyll: sombrero de copa MÁS ALTA que el del doctor,
+ * barba abundante, abrigo largo con faldones hasta las pantorrillas y su
+ * propio bastón en la mano izquierda. El acento cálido que evita que sea un
+ * clon de la silueta de Jekyll es un RELOJ DE BOLSILLO de latón (lampFire)
+ * con cadena pálida y doble halo tenue. Determinista, sin sangre.
+ */
+function drawLanyon(g: Phaser.GameObjects.Graphics): void {
+  const dark = hexToNumber(buildings); // silueta completa
+  const brass = hexToNumber(lampFire); // reloj de bolsillo de latón
+  const pale = hexToNumber(parchmentLight); // cadena y botones del chaleco
+  const ink = hexToNumber(parchmentDark); // cinta del sombrero y raya del abrigo
+
+  // Halo cálido tenue alrededor del reloj (el acento distintivo de Lanyon).
+  g.fillStyle(brass, 0.1);
+  g.fillCircle(46, 104, 26);
+  g.fillStyle(brass, 0.16);
+  g.fillCircle(46, 104, 16);
+
+  // Piernas y zapatos (los faldones del abrigo caerán sobre ellos).
+  g.fillStyle(dark, 1);
+  g.fillRect(48, 160, 12, 40);
+  g.fillRect(66, 160, 12, 40);
+  g.fillRect(42, 198, 21, 8);
+  g.fillRect(62, 198, 21, 8);
+
+  // Abrigo largo: torso ancho, hombros y faldones hasta las pantorrillas.
+  g.fillRect(40, 68, 46, 88);
+  g.fillRect(34, 74, 58, 18); // hombros
+  g.fillTriangle(40, 150, 32, 190, 58, 156); // faldón izquierdo
+  g.fillTriangle(86, 150, 94, 190, 68, 156); // faldón derecho
+
+  // Raya del abrigo y botones pálidos del chaleco que asoman.
+  g.fillStyle(ink, 1);
+  g.fillRect(59, 86, 2, 66);
+  g.fillStyle(pale, 0.8);
+  g.fillRect(58, 92, 4, 4);
+  g.fillRect(58, 104, 4, 4);
+  g.fillRect(58, 116, 4, 4);
+  g.fillRect(58, 128, 4, 4);
+
+  // Reloj de bolsillo de latón: cadena pálida, caja y esfera oscura.
+  g.fillStyle(pale, 0.6);
+  g.fillRect(50, 96, 3, 12);
+  g.fillStyle(brass, 1);
+  g.fillCircle(46, 112, 6);
+  g.fillStyle(ink, 1);
+  g.fillCircle(46, 112, 2.4);
+
+  // Brazo izquierdo colgando con SU PROPIO bastón (pomo, vara y mano).
+  g.fillStyle(dark, 1);
+  g.fillTriangle(44, 76, 28, 128, 50, 132);
+  g.fillCircle(34, 134, 6); // mano
+  g.fillRect(32, 138, 4, 56); // vara
+  g.fillCircle(33, 136, 5); // pomo
+
+  // Brazo derecho colgando.
+  g.fillTriangle(82, 78, 98, 126, 76, 130);
+
+  // Cuello, cabeza y BARBA abundante (la diferencia clave con Jekyll).
+  g.fillStyle(dark, 1);
+  g.fillRect(54, 60, 16, 8);
+  g.fillCircle(60, 48, 13);
+  g.fillTriangle(47, 52, 73, 52, 60, 84);
+  g.fillCircle(52, 66, 6);
+  g.fillCircle(68, 66, 6);
+
+  // Sombrero de copa MUY ALTA (más que la de Jekyll) con cinta y ala.
+  g.fillRect(42, 2, 36, 30);
+  g.fillRect(34, 30, 52, 7);
+  g.fillStyle(ink, 1);
+  g.fillRect(42, 24, 36, 6);
+}
+
+/**
+ * El BASTÓN DE MANGO BLANCO del Nivel 2 (mecánica «cane-strike»): bastón de
+ * paseo —NADA de arma sangrienta, público 10+— en horizontal (180×48) listo
+ * para que la escena lo esgrima o lo gire. El mango pálido (parchmentLight)
+ * en «L» con curva de paseo es el punto focal: doble halo tenue del mismo
+ * color lo hace leer CLARAMENTE como mango blanco de lejos; el puño lleva
+ * muescas de agarre y la unión mango/vara un aro de latón (lampFire), como
+ * la férula de la punta. La vara es oscura (buildings) y se afina. La escena
+ * puede voltearlo (flipX) para que Hyde lo empuñe. Determinista.
+ */
+function drawCane(g: Phaser.GameObjects.Graphics): void {
+  const dark = hexToNumber(buildings); // vara
+  const pale = hexToNumber(parchmentLight); // mango blanco
+  const brass = hexToNumber(lampFire); // aro de la unión y férula
+  const ink = hexToNumber(parchmentDark); // sombra y muescas del mango
+
+  // Doble halo suave alrededor del mango (el blanco se lee de lejos).
+  g.fillStyle(pale, 0.1);
+  g.fillCircle(56, 16, 20);
+  g.fillStyle(pale, 0.14);
+  g.fillCircle(56, 16, 13);
+
+  // Vara oscura y delgada que se afina hacia la punta (dos tramos).
+  g.fillStyle(dark, 1);
+  g.fillRect(52, 24, 84, 6);
+  g.fillRect(136, 25, 34, 4);
+
+  // Aro de latón en la unión mango/vara y férula de latón en la punta.
+  g.fillStyle(brass, 0.95);
+  g.fillRect(50, 22, 8, 10);
+  g.fillRect(166, 24, 10, 6);
+
+  // MANGO BLANCO en «L»: puño horizontal + cuello vertical hacia la vara.
+  g.fillStyle(pale, 1);
+  g.fillRect(42, 4, 32, 9);
+  g.fillRect(46, 4, 9, 26);
+  g.fillCircle(46, 8, 7); // la esquina de la curva de paseo abulta
+
+  // Sombra bajo el puño y muescas de agarre (veteado del marfil).
+  g.fillStyle(ink, 0.35);
+  g.fillRect(42, 11, 32, 2);
+  g.fillRect(54, 5, 2, 5);
+  g.fillRect(61, 5, 2, 5);
+  g.fillRect(68, 5, 2, 5);
+}
+
+/**
+ * Poole el mayordomo (Nivel 3): figura ALTA en chaqueta de librea oscura
+ * (buildings) con chaleco (street) de botones pálidos, cuello blanco de
+ * sirviente y sin sombrero (pelo corto). Pose NERVIOSA pero decidida: el
+ * brazo derecho EN ALTO golpeando la puerta del laboratorio, con chispas
+ * cálidas (lampFire) en el punto del golpe — el mismo lenguaje de las
+ * farolas. Sin sangre, tono caricaturesco. Determinista.
+ */
+function drawPoole(g: Phaser.GameObjects.Graphics): void {
+  const dark = hexToNumber(buildings); // librea y silueta
+  const vest = hexToNumber(street); // chaleco
+  const pale = hexToNumber(parchmentLight); // botones y cuello
+  const fire = hexToNumber(lampFire); // chispas del golpe
+
+  // Piernas (pantalón de librea) y zapatos.
+  g.fillStyle(dark, 1);
+  g.fillRect(48, 116, 12, 66);
+  g.fillRect(64, 116, 12, 66);
+  g.fillRect(42, 180, 21, 8);
+  g.fillRect(62, 180, 21, 8);
+
+  // Chaqueta de librea: torso, hombros y faldones cortos.
+  g.fillRect(42, 48, 38, 72);
+  g.fillRect(38, 52, 46, 16);
+  g.fillTriangle(42, 114, 32, 150, 54, 118);
+  g.fillTriangle(80, 114, 90, 150, 68, 118);
+
+  // Chaleco con botones pálidos (el detalle que lee la librea).
+  g.fillStyle(vest, 1);
+  g.fillRect(52, 56, 18, 58);
+  g.fillStyle(pale, 0.9);
+  g.fillRect(58, 66, 4, 4);
+  g.fillRect(58, 78, 4, 4);
+  g.fillRect(58, 90, 4, 4);
+  g.fillRect(58, 102, 4, 4);
+
+  // Cuello blanco de sirviente.
+  g.fillStyle(pale, 1);
+  g.fillRect(53, 48, 16, 5);
+
+  // Brazo izquierdo colgando, pegado al cuerpo (los nervios lo encogen).
+  g.fillStyle(dark, 1);
+  g.fillTriangle(44, 58, 28, 102, 50, 106);
+  g.fillCircle(34, 108, 6);
+
+  // Brazo DERECHO EN ALTO golpeando: puño cerrado y chispas del impacto.
+  g.fillTriangle(76, 58, 96, 22, 84, 64);
+  g.fillCircle(98, 20, 8);
+  g.fillStyle(fire, 0.85);
+  g.fillTriangle(110, 8, 116, 14, 110, 14);
+  g.fillTriangle(112, 24, 118, 28, 112, 30);
+
+  // Cabeza descubierta: pelo corto de mayordomo sobre la cara.
+  g.fillStyle(dark, 1);
+  g.fillCircle(61, 24, 11);
+  g.fillCircle(61, 34, 10);
+}
+
+/**
+ * El abogado Utterson (Nivel 3): hombre CORPULENTO de edad media — abrigo
+ * pesado en trapecio ancho (buildings), sombrero de fieltro de copa baja y
+ * ala ancha, patillas grises (acento pálido tenue) y bufanda pálida
+ * (parchmentLight) con fleco: el acento que lo distingue del resto de la
+ * noche. Apoya su PROPIO bastón (trazo diagonal que llega al suelo). Su
+ * seriedad la cuenta la postura maciza, sin rasgos agresivos. Determinista.
+ */
+function drawUtterson(g: Phaser.GameObjects.Graphics): void {
+  const dark = hexToNumber(buildings); // abrigo, sombrero y bastón
+  const pale = hexToNumber(parchmentLight); // bufanda y patillas
+  const ink = hexToNumber(parchmentDark); // cinta del sombrero
+
+  // Piernas y zapatos (el abrigo pesado cae sobre ellas).
+  g.fillStyle(dark, 1);
+  g.fillRect(46, 158, 13, 38);
+  g.fillRect(66, 158, 13, 38);
+  g.fillRect(40, 194, 22, 8);
+  g.fillRect(63, 194, 22, 8);
+
+  // Abrigo PESADO: trapecio corpulento con ruedo por debajo de la cadera.
+  g.fillTriangle(38, 56, 86, 56, 100, 162);
+  g.fillTriangle(38, 56, 100, 162, 24, 162);
+  g.fillRect(24, 156, 76, 12);
+
+  // Botones pálidos de la doble hilera (legibilidad del abrigo cerrado).
+  g.fillStyle(pale, 0.7);
+  g.fillRect(54, 84, 4, 4);
+  g.fillRect(54, 100, 4, 4);
+  g.fillRect(54, 116, 4, 4);
+
+  // Bufanda pálida con faldón y fleco (el acento del abogado).
+  g.fillStyle(pale, 1);
+  g.fillRect(50, 48, 24, 9);
+  g.fillRect(64, 55, 9, 26);
+  g.fillStyle(pale, 0.6);
+  g.fillRect(66, 79, 6, 4);
+
+  // Brazo izquierdo grueso, enfundado en el abrigo.
+  g.fillStyle(dark, 1);
+  g.fillTriangle(40, 64, 24, 118, 50, 120);
+
+  // Brazo derecho con el bastón apoyado en el suelo (trazo diagonal).
+  g.fillTriangle(84, 66, 98, 116, 76, 118);
+  g.fillCircle(94, 120, 6); // mano
+  g.lineStyle(4, dark, 1);
+  g.beginPath();
+  g.moveTo(94, 122);
+  g.lineTo(102, 198);
+  g.strokePath();
+  g.fillCircle(102, 198, 3); // férula
+
+  // Cabeza con patillas de edad (acento pálido tenue).
+  g.fillCircle(62, 41, 13);
+  g.fillStyle(pale, 0.45);
+  g.fillRect(50, 38, 4, 9);
+  g.fillRect(70, 38, 4, 9);
+
+  // Sombrero de fieltro: copa baja redondeada y ala ancha con cinta.
+  g.fillStyle(dark, 1);
+  g.fillRect(48, 12, 28, 14);
+  g.fillCircle(62, 12, 12);
+  g.fillRect(38, 24, 48, 6);
+  g.fillStyle(ink, 1);
+  g.fillRect(48, 19, 28, 5);
+}
+
+/**
+ * Puerta del laboratorio (Nivel 3): puerta PESADA de roble cerrada en un
+ * marco de piedra vitoriano. El muro (buildings) lleva juntas de sillería
+ * (street en alfa), el marco es piedra más clara (street) con dintel y
+ * DOVELA central, y la hoja de roble (parchmentDark, el marrón cálido de la
+ * paleta) lleva DOS paneles hundidos con bisagras de latón (lampFire), pomo
+ * de latón con doble halo, cerradura y las MARCAS DE GOLPES de Poole y
+ * Utterson (muescas pálidas en el panel inferior). Se lee como puerta
+ * cerrada de laboratorio: maciza, claveteada, sin sangre. Determinista.
+ */
+function drawLabDoor(g: Phaser.GameObjects.Graphics): void {
+  const stone = hexToNumber(buildings); // muro de piedra
+  const joint = hexToNumber(street); // juntas de sillería y marco
+  const oak = hexToNumber(parchmentDark); // hoja de roble
+  const brass = hexToNumber(lampFire); // pomo, bisagras y placa
+  const pale = hexToNumber(parchmentLight); // luces de los paneles y golpes
+  const shadow = hexToNumber(buildings); // paneles hundidos y cerradura
+
+  // Muro de piedra: todo el lienzo, con juntas de sillería horizontales.
+  g.fillStyle(stone, 1);
+  g.fillRect(0, 0, 200, 320);
+  g.fillStyle(joint, 0.45);
+  g.fillRect(0, 16, 200, 3);
+  g.fillRect(0, 110, 200, 3);
+  g.fillRect(0, 210, 200, 3);
+  g.fillRect(0, 290, 200, 3);
+  // Juntas verticales en los costados (dovelas desalineadas, deterministas).
+  g.fillRect(8, 40, 3, 70);
+  g.fillRect(18, 130, 3, 80);
+  g.fillRect(186, 40, 3, 80);
+  g.fillRect(176, 140, 3, 70);
+
+  // Marco de piedra (más claro que el muro) alrededor del vano.
+  g.fillStyle(joint, 1);
+  g.fillRect(30, 40, 140, 280);
+
+  // Dintel con dovela central de la clave (arco aplanado vitoriano).
+  g.fillRect(22, 30, 156, 14);
+  g.fillTriangle(90, 22, 110, 22, 106, 44);
+  g.fillTriangle(94, 44, 106, 44, 100, 22);
+  g.fillStyle(pale, 0.25);
+  g.fillRect(22, 32, 156, 3); // luz del canto superior del dintel
+
+  // Umbral de piedra en la base.
+  g.fillStyle(joint, 1);
+  g.fillRect(24, 308, 152, 12);
+
+  // Hoja de roble (marrón cálido) con vetas verticales tenues.
+  g.fillStyle(oak, 1);
+  g.fillRect(42, 52, 116, 268);
+  g.fillStyle(shadow, 0.5);
+  g.fillRect(66, 52, 2, 268);
+  g.fillRect(96, 52, 2, 268);
+  g.fillRect(126, 52, 2, 268);
+
+  // Paneles hundidos con luz pálida en el canto superior.
+  g.fillStyle(shadow, 1);
+  g.fillRoundedRect(56, 72, 88, 84, 6);
+  g.fillRoundedRect(56, 176, 88, 96, 6);
+  g.fillStyle(pale, 0.25);
+  g.fillRect(58, 74, 84, 3);
+  g.fillRect(58, 178, 84, 3);
+
+  // Bisagras de latón en el lado izquierdo.
+  g.fillStyle(brass, 0.85);
+  g.fillRect(36, 96, 8, 14);
+  g.fillRect(36, 200, 8, 14);
+
+  // Placa del doctor (latón, sin texto: la escena superpone el rótulo).
+  g.fillStyle(brass, 0.45);
+  g.fillRect(78, 60, 44, 10);
+
+  // Pomo de latón con doble halo (resplandor del gas del pasillo).
+  g.fillStyle(brass, 0.18);
+  g.fillCircle(146, 186, 16);
+  g.fillStyle(brass, 0.3);
+  g.fillCircle(146, 186, 11);
+  g.fillStyle(brass, 1);
+  g.fillCircle(146, 186, 7);
+  // Placa de la cerradura con ojo de la cerradura oscuro.
+  g.fillStyle(brass, 0.6);
+  g.fillRect(140, 180, 12, 26);
+  g.fillStyle(shadow, 1);
+  g.fillCircle(146, 198, 2.6);
+
+  // Marcas de golpes de Poole y Utterson: muescas pálidas en el panel bajo.
+  g.fillStyle(pale, 0.35);
+  g.fillRect(90, 236, 7, 3);
+  g.fillRect(103, 244, 7, 3);
+  g.fillRect(94, 253, 7, 3);
+}
+
+/**
 /**
  * Registro de texturas: primera hornada (PLAN Etapa 1) + iconos de la
  * Etapa 2 («Cómo jugar» y toggle de mute) + fondo «lab» de la Etapa 3 +
  * la niña de la Etapa 4 + el sello de cera de la Etapa 6 + los dos personajes
  * de la intro (Jekyll/Hyde, cinemática pre-nivel) + el brazo articulado de
- * Hyde y la flecha de navegación. Hornadas futuras se añaden
+ * Hyde y la flecha de navegación + la Fase 2 del PLAN (personajes y props de
+ * los niveles 2 y 3: Lanyon, el bastón de mango blanco, Poole, Utterson y la
+ * puerta del laboratorio). Hornadas futuras se añaden
  * AQUÍ AL FINAL (hay tests que hacen slicing por índice del registro).
  */
 export const TEXTURE_DEFS: readonly TextureDef[] = [
@@ -882,6 +1238,46 @@ export const TEXTURE_DEFS: readonly TextureDef[] = [
     description:
       'Estrella del cielo nocturno de 4 puntas: titila por opacidad en los fondos exteriores.',
     draw: drawStar,
+  },
+  {
+    key: TEXTURE_KEYS.lanyon,
+    width: 128,
+    height: 208,
+    description:
+      'El Dr. Lanyon: médico distinguido con copa alta, barba, faldones y reloj de latón (objetivo del N2).',
+    draw: drawLanyon,
+  },
+  {
+    key: TEXTURE_KEYS.cane,
+    width: 180,
+    height: 48,
+    description:
+      'Bastón de paseo de MANGO BLANCO con aro de latón: el prop de la mecánica «cane-strike» (N2).',
+    draw: drawCane,
+  },
+  {
+    key: TEXTURE_KEYS.poole,
+    width: 120,
+    height: 200,
+    description:
+      'Poole el mayordomo: librea oscura con botones pálidos y brazo en alto golpeando (N3).',
+    draw: drawPoole,
+  },
+  {
+    key: TEXTURE_KEYS.utterson,
+    width: 124,
+    height: 204,
+    description:
+      'El abogado Utterson: corpulento, abrigo pesado, sombrero de fieltro, bufanda y bastón (N3).',
+    draw: drawUtterson,
+  },
+  {
+    key: TEXTURE_KEYS.labDoor,
+    width: 200,
+    height: 320,
+    description:
+      'Puerta pesada de roble cerrada en marco de piedra, con pomo de latón y marcas de golpes (N3).',
+    draw: drawLabDoor,
   },
 ];
 
