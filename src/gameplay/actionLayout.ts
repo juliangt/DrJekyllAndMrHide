@@ -15,12 +15,19 @@
  *    GAME_OVER (la niebla nunca tapa la UI, SPEC §9).
  */
 
-import { STREET_LINE_Y } from '../art/parallax';
 import {
+  ACTION_PARALLAX_LAYERS,
+  LAB_PARALLAX_LAYERS,
+  STREET_LINE_Y,
+} from '../art/parallax';
+import type { HexColor } from '../config/palette';
+import {
+  buildings,
   error,
   lampFire,
   parchmentDark,
   parchmentLight,
+  street,
   success,
   textPrimary,
 } from '../config/palette';
@@ -69,16 +76,22 @@ export const ACTION_LAYOUT = {
     pause: { x: 636, y: 84 },
   },
 
-  /** Profundidades de pintado (niebla < niña < efectos < HUD < overlay). */
+  /** Profundidades de pintado (props < niebla < objetivo < efectos < HUD < overlay). */
   depths: {
-    /** La niña: por encima de TODA la niebla (legibilidad del objetivo). */
+    /** Props de la mecánica (puerta del lab, mesa, Poole/Utterson de fondo). */
+    props: 4.6,
+    /** Aura púrpura de la transformación (detrás del objetivo, sobre la niebla). */
+    aura: 5.6,
+    /** El objetivo (niña/Lanyon/Hyde): por encima de TODA la niebla. */
     girl: 6,
-    /** Puffs de niebla (tap al aire) y estallidos del susto. */
+    /** Puffs de niebla (tap al aire), estallidos y swing del bastón. */
     effects: 7,
     /** «!», «+10», bonus de tiempo (feedback flotante). */
     feedback: 8,
     /** HUD (contador, timer, puntaje, pausa). */
     hud: 10,
+    /** Carátula de la línea de victoria de Hyde (N2), bajo el overlay. */
+    victory: 20,
     /** Overlay GAME_OVER (timeout): por encima de todo. */
     overlay: 50,
   },
@@ -206,6 +219,69 @@ export const GIRL_WALK_BOB = {
   tiltRad: 0.045,
   /** Velocidad angular de la inclinación (rad/s). */
   tiltSpeed: 4.5,
+} as const;
+
+// ---- Fase 3: tamaños por objetivo y fondos por mecánica -----------------------
+
+/**
+ * Tamaño de DESPLIEGUE de cada objetivo (px) — las texturas de N2/N3 no
+ * comparten el tamaño de la niña (N1). La hitbox +20 % se calcula SIEMPRE
+ * sobre estos tamaños; todos mantienen el mínimo táctil ≥ 64 px (SPEC §9).
+ * La clave es la textura; la mecánica elige la suya (girl/lanyon/hyde).
+ */
+export const ACTION_TARGET_SIZES = {
+  /** La niña (N1): igual que `ACTION_LAYOUT.girl` (referencia compartida). */
+  girl: { width: 120, height: 220 },
+  /** El Dr. Lanyon (N2; textura base 128×208). */
+  lanyon: { width: 122, height: 198 },
+  /** Hyde (N3; textura base 144×240). */
+  hyde: { width: 132, height: 220 },
+  /** Jekyll (N3; textura base 128×224). */
+  jekyll: { width: 120, height: 210 },
+} as const;
+
+/**
+ * Fondo por mecánica (datos): el callejón de la noche para N1/N2 (misma
+ * tabla `ACTION_PARALLAX_LAYERS` — N2 añade estrellas titilando) y el
+ * interior del laboratorio para N3 (vapor púrpura/verde de `LAB_PARALLAX_
+ * LAYERS` + props en `ActionScene`). El color del suelo cambia: adoquines
+ * de calle fuera, madera/piedra oscura del lab dentro.
+ */
+export const ACTION_BACKGROUNDS: Readonly<
+  Record<
+    string,
+    {
+      layers: typeof ACTION_PARALLAX_LAYERS;
+      groundColor: HexColor;
+      stars: boolean;
+    }
+  >
+> = {
+  'tap-target': { layers: ACTION_PARALLAX_LAYERS, groundColor: street, stars: false },
+  'cane-strike': { layers: ACTION_PARALLAX_LAYERS, groundColor: street, stars: true },
+  'transform-target': { layers: LAB_PARALLAX_LAYERS, groundColor: buildings, stars: false },
+} as const;
+
+/**
+ * Props del laboratorio para la mecánica 'transform-target' (N3, Fase 3):
+ * la puerta asediada centrada, la mesa con frascos y los dos golpeatores
+ * (Poole/Utterson) que golpean durante la intro y entran al final. Todo
+ * tamaño de despliegue en px sobre el lienzo 720×1280.
+ */
+export const ACTION_LAB_PROPS = {
+  /** Puerta del lab: centrada, apoyada en la línea de suelo. */
+  door: { x: 360, y: 880, width: 220, height: 352, openAlpha: 0.16 },
+  /** Mesa de laboratorio (esquina izquierda, bajo la zona de juego). */
+  bench: { x: 122, y: 1008, width: 220, height: 92 },
+  /** Frascos sobre la mesa (se tiñen con la paleta del lab). */
+  flaskA: { x: 84, y: 944, width: 44, height: 66 },
+  flaskB: { x: 158, y: 950, width: 38, height: 58 },
+  /** Poole golpeando (izquierda de la puerta; entra por la derecha al final). */
+  poole: { x: 172, y: 946, width: 116, height: 194 },
+  /** Utterson golpeando (derecha de la puerta; entra por la izquierda al final). */
+  utterson: { x: 548, y: 944, width: 120, height: 196 },
+  /** Empujón de los golpeatores con cada golpe de puerta (px y ms). */
+  knockLunge: { px: 6, ms: 70 },
 } as const;
 
 // ---- FPS debug (?debug, Etapa 7) ----------------------------------------------

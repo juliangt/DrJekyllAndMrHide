@@ -11,6 +11,10 @@
  *
  * Sin import de Phaser: jsdom no puede cargarlo y no hace falta — esto es
  * geometría y aritmética.
+ *
+ * Fase 3 (multi-nivel): `stepFlee` añade el patrón de HUIDA del N2 — el
+ * objetivo tiende a ALEJARSE del punto del último tap girando su rumbo con
+ * la rapidez conservada (ver su docblock). `stepErratic` queda intacto.
  */
 
 /** Generador de aleatorios inyectable: devuelve un número en [0, 1). */
@@ -148,4 +152,85 @@ export function stepErratic(
 /** Rapidez actual (px/s): `hypot(vx, vy)` — útil para tests y debugging. */
 export function erraticSpeed(state: ErraticState): number {
   return Math.hypot(state.vx, state.vy);
+}
+
+// ---- Huida (N2 «cane-strike», Fase 3) ----------------------------------------
+
+/** Un punto de amenaza (p. ej. el punto del último tap del jugador). */
+export interface ThreatPoint {
+  x: number;
+  y: number;
+}
+
+/**
+ * Sesgo de huida por defecto (0..1): cuánto de la dirección nueva se toma
+ * del vector «alejarse de la amenaza» frente al rumbo errático actual.
+ * 0.55 mantiene el vaivén impredecible pero la huida se NOTA (el Dr. Lanyon
+ * se aleja del punto donde Hyde pegó el último bastonazo).
+ */
+export const DEFAULT_FLEE_BIAS = 0.55;
+
+/**
+ * Un paso de HUIDA (Nivel 2): el patrón «tiende a alejarse del punto del
+ * último tap» como FUNCIÓN PURA, reutilizando `stepErratic` intacto.
+ *
+ * Pipeline por frame:
+ *  1. Un paso errático normal (integración, rebote en bounds, re-sorteos con
+ *     el rng — misma aritmética y mismos invariantes que N1).
+ *  2. GIRO DE HUIDA: se mezcla el rumbo actual con el vector unitario
+ *     «alejarse de la amenaza» (`(1 - bias) · rumbo + bias · huida`) y se
+ *     RENORMALIZA a la rapidez original — la rapidez se CONSERVA siempre
+ *     (invariante `speedRange` intacto) y la amenaza se evalúa contra la
+ *     posición ya integrada del paso.
+ *
+ * Elección de diseño (documentada): girar la velocidad existente en vez de
+ * re-sortear direcciones mantiene el determinismo del rng (consume EXACTAMENTE
+ * los mismos números que `stepErratic`), conserva la rapidez (test fácil) y
+ * la huida responde el mismo frame del tap sin esperar al próximo re-sorteo.
+ *
+ *  - `threat === null` o `bias ≤ 0` → idéntico a `stepErratic` (mismo
+ *    resultado, misma secuencia rng).
+ *  - `dtMs` ≤ 0 o no finito → estado intacto (frame congelado), como N1.
+ */
+export function stepFlee(
+  state: ErraticState,
+  dtMs: number,
+  rng: Rng,
+  options: ErraticOptions,
+  threat: ThreatPoint | null,
+  bias: number = DEFAULT_FLEE_BIAS,
+): ErraticState {
+  if (!(dtMs > 0) || !Number.isFinite(dtMs)) {
+    return state; // frame congelado: ni integración ni giro de huida
+  }
+  const stepped = stepErratic(state, dtMs, rng, options);
+  if (!threat || !(bias > 0) || !Number.isFinite(bias)) {
+    return stepped;
+  }
+  const speed = erraticSpeed(stepped);
+  if (!(speed > 1e-9)) {
+    return stepped; // sin rapidez no hay rumbo que girar
+  }
+  const dx = stepped.x - threat.x;
+  const dy = stepped.y - threat.y;
+  const distance = Math.hypot(dx, dy);
+  if (!(distance > 1e-9)) {
+    return stepped; // amenaza encima: sin dirección de huida definida
+  }
+  // Mezcla de rumbos + renormalización a la rapidez original (conservada).
+  const awayX = dx / distance;
+  const awayY = dy / distance;
+  const headingX = stepped.vx / speed;
+  const headingY = stepped.vy / speed;
+  const blendX = (1 - bias) * headingX + bias * awayX;
+  const blendY = (1 - bias) * headingY + bias * awayY;
+  const blendLength = Math.hypot(blendX, blendY);
+  if (!(blendLength > 1e-9)) {
+    return stepped; // rumbo exactamente opuesto a la huida: sin giro este frame
+  }
+  return {
+    ...stepped,
+    vx: (blendX / blendLength) * speed,
+    vy: (blendY / blendLength) * speed,
+  };
 }

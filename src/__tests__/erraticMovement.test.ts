@@ -215,3 +215,104 @@ describe('stepErratic — fuzz de invariantes (nunca sale de bounds)', () => {
 function stepErrStep(before: ErraticState, dt: number): ErraticState {
   return stepErratic(before, dt, constantRng(0.5), OPTIONS);
 }
+
+// ---------------------------------------------------------------------------
+// Fase 3 — stepFlee: el patrón de HUIDA del N2 («tiende a alejarse del punto
+// del último tap»). Mismos invariantes que stepErratic + giro de huida con
+// la rapidez CONSERVADA.
+// ---------------------------------------------------------------------------
+import { DEFAULT_FLEE_BIAS, stepFlee } from '../gameplay/erraticMovement';
+
+describe('stepFlee — contrato básico', () => {
+  it('dt ≤ 0 o no finito: estado intacto (frame congelado, como N1)', () => {
+    const state = stateAt({ vx: 150, vy: 0 });
+    const threat = { x: 0, y: 0 };
+    for (const dt of [0, -50, NaN, Number.POSITIVE_INFINITY]) {
+      expect(stepFlee(state, dt, Math.random, OPTIONS, threat)).toBe(state);
+    }
+  });
+
+  it('sin amenaza (threat=null) es IDÉNTICO a stepErratic (misma secuencia rng)', () => {
+    const state = stateAt({});
+    const a = stepFlee(state, 16, Math.random, OPTIONS, null);
+    const b = stepErratic(state, 16, Math.random, OPTIONS);
+    expect(a).toEqual(b);
+  });
+
+  it('bias 0 (o inválido) también degenera en stepErratic', () => {
+    const state = stateAt({});
+    const threat = { x: state.x - 100, y: state.y };
+    const a = stepFlee(state, 16, Math.random, OPTIONS, threat, 0);
+    const b = stepErratic(state, 16, Math.random, OPTIONS);
+    expect(a).toEqual(b);
+    const c = stepFlee(state, 16, Math.random, OPTIONS, threat, NaN);
+    expect(c).toEqual(b);
+  });
+
+  it('CONSERVA la rapidez (solo gira el rumbo, nunca acelera ni frena)', () => {
+    const state = stateAt({ vx: 150, vy: 60 });
+    const threat = { x: state.x + 300, y: state.y - 200 };
+    let next = state;
+    for (let i = 0; i < 50; i++) {
+      next = stepFlee(next, 33, Math.random, OPTIONS, threat);
+      expect(erraticSpeed(next)).toBeCloseTo(erraticSpeed(stateAt({ vx: 150, vy: 60 })), 6);
+    }
+  });
+
+  it('NO consume rng extra: misma cantidad de números que stepErratic', () => {
+    const state = stateAt({ nextDirChangeIn: 10 }); // fuerza 1 re-sorteo
+    const threat = { x: 0, y: 0 };
+    const a = sequenceRng([0.5]);
+    const b = sequenceRng([0.5]);
+    stepFlee(state, 50, a.rng, OPTIONS, threat);
+    stepErratic(state, 50, b.rng, OPTIONS);
+    expect(a.calls()).toBe(b.calls());
+  });
+});
+
+describe('stepFlee — el patrón de huida', () => {
+  it('gira el rumbo ALEJÁNDOSE de la amenaza (proyección de huida creciente)', () => {
+    // Corriendo DIRECTO hacia la amenaza, tras un paso el rumbo ya se abre.
+    const state = stateAt({ vx: 150, vy: 0 });
+    const threat = { x: state.x + 200, y: state.y }; // amenaza delante
+    const next = stepFlee(state, 16, constantRng(0.5), OPTIONS, threat);
+    const away = { x: -1, y: 0 }; // vector unitario de huida
+    const dotBefore = (state.vx / erraticSpeed(state)) * away.x + (state.vy / erraticSpeed(state)) * away.y;
+    const dotAfter = (next.vx / erraticSpeed(next)) * away.x + (next.vy / erraticSpeed(next)) * away.y;
+    expect(dotAfter).toBeGreaterThan(dotBefore);
+  });
+
+  it('con el sesgo por defecto la distancia a la amenaza CRECE con los pasos', () => {
+    const threat = { x: 360, y: 680 };
+    let state = stateAt({});
+    state = { ...state, x: threat.x + 120, y: threat.y }; // 120 px a la derecha
+    const initialDistance = Math.hypot(state.x - threat.x, state.y - threat.y);
+    for (let i = 0; i < 200; i++) {
+      state = stepFlee(state, 33, Math.random, OPTIONS, threat);
+    }
+    const finalDistance = Math.hypot(state.x - threat.x, state.y - threat.y);
+    expect(finalDistance).toBeGreaterThan(initialDistance);
+  });
+
+  it('bias 1 = huida pura: tras suficientes pasos se aleja en línea recta', () => {
+    const threat = { x: 360, y: 680 };
+    let state = stateAt({ x: threat.x + 150, y: threat.y, vx: -150, vy: 0 });
+    for (let i = 0; i < 60; i++) {
+      state = stepFlee(state, 33, Math.random, OPTIONS, threat, 1);
+    }
+    expect(state.x).toBeGreaterThan(threat.x + 150);
+  });
+
+  it('mantiene los invariantes de N1: rebote en bounds y re-sorteos en rango', () => {
+    let state = initialErraticState(Math.random, OPTIONS);
+    const threat = { x: 360, y: 680 };
+    for (let i = 0; i < 1000; i++) {
+      state = stepFlee(state, Math.random() * 120, Math.random, OPTIONS, threat, DEFAULT_FLEE_BIAS);
+      expect(state.x).toBeGreaterThanOrEqual(OPTIONS.bounds.minX - 1e-9);
+      expect(state.x).toBeLessThanOrEqual(OPTIONS.bounds.maxX + 1e-9);
+      expect(state.y).toBeGreaterThanOrEqual(OPTIONS.bounds.minY - 1e-9);
+      expect(state.y).toBeLessThanOrEqual(OPTIONS.bounds.maxY + 1e-9);
+      expect(state.nextDirChangeIn).toBeGreaterThan(0);
+    }
+  });
+});

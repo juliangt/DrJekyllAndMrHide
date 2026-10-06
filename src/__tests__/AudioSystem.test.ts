@@ -669,3 +669,57 @@ describe('AudioSystem — errorSound (error del quiz, SPEC §8/Etapa 5)', () => 
     });
   });
 });
+
+describe('AudioSystem — knock (golpe de puerta, Fase 3/N3)', () => {
+  it('sin unlock y con mute es no-op (no crea fuentes)', () => {
+    const { audio, ctx } = makeSystem();
+    audio.knock();
+    expect(audio.isUnlocked).toBe(false);
+    expect(ctx.oscillators.length).toBe(0);
+    expect(ctx.gains.length).toBe(0);
+
+    const muted = makeSystem();
+    muted.audio.unlock();
+    muted.audio.setMuted(true);
+    muted.audio.knock();
+    expect(muted.ctx.oscillators.length).toBe(0);
+    expect(muted.ctx.gains.length).toBe(0);
+  });
+
+  it('golpe seco: seno MUY grave con ataque corto (no click) y caída exponencial', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.knock();
+
+    expect(ctx.oscillators.length).toBe(1);
+    const osc = ctx.oscillators[0];
+    const gain = ctx.gains[0];
+
+    expect(osc.type).toBe('sine');
+    const [fromHz] = osc.frequency.setValueAtTimeCalls[0];
+    const [toHz, atT] = osc.frequency.exponentialRampCalls[0];
+    expect(fromHz).toBeLessThanOrEqual(120); // más grave que el thump del hit
+    expect(toHz).toBeLessThan(fromHz);
+    expect(atT).toBeCloseTo(ctx.currentTime + 0.16, 5);
+    // Ataque corto (linearRamp desde ~0) para que lea como GOLPE, no tono.
+    expect(gain.gain.linearRampCalls.length).toBe(1);
+    const [, attackAt] = gain.gain.linearRampCalls[0];
+    expect(attackAt).toBeLessThan(ctx.currentTime + 0.05);
+    expect(gain.gain.exponentialRampCalls[0][0]).toBeLessThanOrEqual(0.001);
+    // Cadena: osc → gain → destination, y start/stop agendados.
+    expect(osc.connectCalls[0]).toBe(gain);
+    expect(gain.connectCalls[0]).toBe(ctx.destination);
+    expect(osc.startedAt).toBe(ctx.currentTime);
+    expect(osc.stoppedAt).toBeCloseTo(ctx.currentTime + 0.16, 5);
+  });
+
+  it('respeta duración y frecuencias personalizadas', () => {
+    const { audio, ctx } = makeSystem();
+    audio.unlock();
+    audio.knock(0.4, 70, 30);
+    const osc = ctx.oscillators[0];
+    expect(osc.frequency.setValueAtTimeCalls[0]).toEqual([70, ctx.currentTime]);
+    expect(osc.frequency.exponentialRampCalls[0]).toEqual([30, ctx.currentTime + 0.4]);
+    expect(osc.stoppedAt).toBeCloseTo(ctx.currentTime + 0.4, 5);
+  });
+});

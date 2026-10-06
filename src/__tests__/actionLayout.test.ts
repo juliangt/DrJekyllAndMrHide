@@ -213,3 +213,92 @@ describe('feedback del tap (SPEC §4.2/§7.2)', () => {
     expect(ACTION_DT_CAP_MS).toBeLessThanOrEqual(250);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Fase 3 — datos nuevos del multi-nivel: tamaños por objetivo, fondos por
+// mecánica, props del laboratorio y depths ampliados.
+// ---------------------------------------------------------------------------
+import {
+  ACTION_BACKGROUNDS,
+  ACTION_LAB_PROPS,
+  ACTION_TARGET_SIZES,
+} from '../gameplay/actionLayout';
+import { LAB_PARALLAX_LAYERS } from '../art/parallax';
+
+describe('ACTION_TARGET_SIZES — despliegue por objetivo (N1/N2/N3)', () => {
+  it('las cuatro formas existen con tamaños positivos', () => {
+    for (const size of Object.values(ACTION_TARGET_SIZES)) {
+      expect(size.width).toBeGreaterThan(0);
+      expect(size.height).toBeGreaterThan(0);
+    }
+  });
+
+  it('TODAS mantienen el mínimo táctil ≥ 64 px con su hitbox +20 % (SPEC §9)', () => {
+    for (const size of Object.values(ACTION_TARGET_SIZES)) {
+      expect(size.width * DEFAULT_HITBOX_EXPANSION).toBeGreaterThanOrEqual(64);
+      expect(size.height * DEFAULT_HITBOX_EXPANSION).toBeGreaterThanOrEqual(64);
+    }
+  });
+
+  it('el sprite completo queda dentro del lienzo en los extremos de la zona', () => {
+    const { playZone } = ACTION_LAYOUT;
+    for (const size of Object.values(ACTION_TARGET_SIZES)) {
+      expect(playZone.minX - size.width / 2).toBeGreaterThanOrEqual(0);
+      expect(playZone.maxX + size.width / 2).toBeLessThanOrEqual(720);
+      expect(playZone.minY - size.height / 2).toBeGreaterThanOrEqual(0);
+      expect(playZone.maxY + size.height / 2).toBeLessThanOrEqual(1280);
+    }
+  });
+
+  it('la niña (N1) comparte tamaño con la tabla histórica', () => {
+    expect(ACTION_TARGET_SIZES.girl).toEqual(ACTION_LAYOUT.girl);
+  });
+});
+
+describe('ACTION_BACKGROUNDS — fondo por mecánica (Fase 3)', () => {
+  it('cubre EXACTAMENTE las tres mecánicas de la unión ActionConfig', () => {
+    expect(Object.keys(ACTION_BACKGROUNDS).sort()).toEqual(
+      ['cane-strike', 'tap-target', 'transform-target'],
+    );
+  });
+
+  it('N1/N2 comparten el callejón; N3 usa el laboratorio', () => {
+    expect(ACTION_BACKGROUNDS['tap-target'].layers).toBe(ACTION_PARALLAX_LAYERS);
+    expect(ACTION_BACKGROUNDS['cane-strike'].layers).toBe(ACTION_PARALLAX_LAYERS);
+    expect(ACTION_BACKGROUNDS['transform-target'].layers).toBe(LAB_PARALLAX_LAYERS);
+  });
+
+  it('solo el N2 añade estrellas; el lab no tiene cielo', () => {
+    expect(ACTION_BACKGROUNDS['tap-target'].stars).toBe(false);
+    expect(ACTION_BACKGROUNDS['cane-strike'].stars).toBe(true);
+    expect(ACTION_BACKGROUNDS['transform-target'].stars).toBe(false);
+  });
+});
+
+describe('ACTION_LAB_PROPS — el asedio (N3)', () => {
+  it('la puerta cabe centrada y apoya en la línea de suelo', () => {
+    const door = ACTION_LAB_PROPS.door;
+    expect(door.x).toBe(720 / 2);
+    expect(door.y + door.height / 2).toBeLessThanOrEqual(ACTION_LAYOUT.groundY + 4);
+  });
+
+  it('Poole y Utterson apoyan en el suelo, a los lados de la puerta', () => {
+    const { poole, utterson, door } = ACTION_LAB_PROPS;
+    for (const knocker of [poole, utterson]) {
+      expect(knocker.y + knocker.height / 2).toBeLessThanOrEqual(ACTION_LAYOUT.groundY + 8);
+    }
+    expect(poole.x + poole.width / 2).toBeLessThan(door.x - door.width / 2);
+    expect(utterson.x - utterson.width / 2).toBeGreaterThan(door.x + door.width / 2);
+  });
+});
+
+describe('depths ampliados (Fase 3) — el orden de pintado sigue sano', () => {
+  it('props y aura quedan DEBAJO del objetivo; la línea de victoria bajo el overlay', () => {
+    const { depths } = ACTION_LAYOUT;
+    expect(depths.props).toBeLessThan(depths.girl);
+    expect(depths.aura).toBeLessThan(depths.girl);
+    expect(depths.aura).toBeGreaterThan(1); // sobre las capas parallax
+    expect(depths.victory).toBeGreaterThan(depths.feedback);
+    expect(depths.victory).toBeLessThan(depths.overlay);
+  });
+});

@@ -134,5 +134,11 @@ export function actionReducer(state: ActionState, event: ActionEvent): ActionSta
         phase: ActionPhase.Restart,
       };
     }
+
+    default: {
+      // Evento fuera de la unión (p. ej. vía el glue de gameplay/round):
+      // ignorado — las fases nuevas de N2/N3 no significan nada para N1.
+      return state;
+    }
   }
 }

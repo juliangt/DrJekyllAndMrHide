@@ -1,14 +1,38 @@
 /**
- * Etapa 4 — test de ActionScene como CAPA FINA data-driven (estilo tests de
- * game.config: se lee el ARCHIVO como fuente, porque importarlo cargaría
- * Phaser y jsdom no puede). Se valida que la escena CONSUME los módulos
- * puros de gameplay/ y los datos, que arrastra multi-touch, que resetea la
- * tanda al entrar y al reintentar, y que sus dos salidas (QUIZ / MENU) y el
- * overlay GAME_OVER están cableados según SPEC §3/§4.2/§6.
+ * Etapa 4 + Fase 3 — test de ActionScene como CAPA FINA data-driven (estilo
+ * tests de game.config: se lee el ARCHIVO como fuente, porque importarlo
+ * cargaría Phaser y jsdom no puede). Se valida que la escena CONSUME los
+ * módulos puros de gameplay/ para las TRES mecánicas (tap-target N1,
+ * cane-strike N2, transform-target N3), que arrastra multi-touch, que
+ * resetea la tanda al entrar y al reintentar, y que sus dos salidas
+ * (QUIZ / MENU) y el overlay GAME_OVER están cableados según SPEC
+ * §3/§4.2/§6. Las REGLAS de las mecánicas nuevas se ejercitan con sus
+ * reducers puros + los datos reales de level2/level3 (fakes estructurales
+ * del cableado de escena).
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { level2 } from '../config/levels/level2';
+import { level3 } from '../config/levels/level3';
+import type {
+  CaneStrikeActionConfig,
+  TransformTargetActionConfig,
+} from '../config/levels/types';
+import {
+  CanePhase,
+  caneReducer,
+  initialCaneState,
+  type CaneEvent,
+} from '../gameplay/caneState';
+import {
+  TargetForm,
+  TransformPhase,
+  initialTransformState,
+  transformReducer,
+  type TransformEvent,
+} from '../gameplay/transformState';
+import { timeBonus } from '../gameplay/scoring';
 
 const source = readFileSync(resolve(process.cwd(), 'src/scenes/ActionScene.ts'), 'utf8');
 
@@ -21,9 +45,24 @@ describe('ActionScene — consume los módulos PUROS de gameplay (arquitectura)'
     expect(source).toContain('ActionEventType.Restart');
   });
 
-  it('movimiento errático por stepErratic con rng inyectable', () => {
+  it('Fase 3: despacha por mecánica a los reducers PUROS caneState/transformState', () => {
+    // El guard de la Fase 1 ya no existe: las tres mecánicas están cableadas.
+    expect(source).not.toContain('aún no está implementada');
+    expect(source).toContain("case 'cane-strike'");
+    expect(source).toContain("case 'transform-target'");
+    expect(source).toContain('initialCaneState');
+    expect(source).toContain('caneReducer');
+    expect(source).toContain('initialTransformState');
+    expect(source).toContain('transformReducer');
+    // El glue unificado de eventos (único punto con casts del proyecto).
+    expect(source).toContain('adaptRoundReducer');
+    expect(source).toContain('RoundEventType');
+  });
+
+  it('movimiento errático por stepErratic con rng inyectable (+ huida N2)', () => {
     expect(source).toContain('stepErratic');
     expect(source).toContain('initialErraticState');
+    expect(source).toContain('stepFlee');
   });
 
   it('hit-test geométrico puro isHit (hitbox +20 %)', () => {
@@ -36,11 +75,18 @@ describe('ActionScene — consume los módulos PUROS de gameplay (arquitectura)'
     expect(source).toContain('tickSecond');
   });
 
-  it('layout y textos desde los DATOS de gameplay (sin números mágicos)', () => {
+  it('layout, textos y SECUENCIAS desde los DATOS de gameplay (sin números mágicos)', () => {
     expect(source).toContain('ACTION_LAYOUT');
     expect(source).toContain('ACTION_FEEDBACK');
     expect(source).toContain('GAME_OVER_OVERLAY');
     expect(source).toContain('GAME_OVER_STYLE');
+    // Fase 3: las secuencias animadas son DATOS (gameplay/actionSequences).
+    expect(source).toContain('CANE_SWING');
+    expect(source).toContain('FALL_SEQUENCE');
+    expect(source).toContain('VICTORY_LINE');
+    expect(source).toContain('TRANSFORM_ANIM');
+    expect(source).toContain('SIEGE_INTRO');
+    expect(source).toContain('SIEGE_ENTRANCE');
   });
 
   it('nivel activo por scene-start data {levelId} (genérica, como NARRATIVE)', () => {
@@ -99,11 +145,15 @@ describe('ActionScene — input multi-touch (CA: 60 taps rápidos no pierden hit
   it('los taps sobre UI no cuentan como juego (currentlyOver)', () => {
     expect(source).toContain('currentlyOver.length > 0');
   });
+
+  it('Fase 3: la intro del asedio (N3) es skipeable con un tap', () => {
+    expect(source).toContain('skipSiegeIntro');
+  });
 });
 
 describe('ActionScene — feedback del tap (SPEC §4.2/§7.2)', () => {
   it('hit: flash + micro-shake de cámara + «!» + «+10» + sonido compuesto', () => {
-    const hitBlock = source.slice(source.indexOf('onHit()'));
+    const hitBlock = source.slice(source.indexOf('private onHit('));
     expect(hitBlock.indexOf('cameras.main.flash')).toBeGreaterThan(-1);
     expect(hitBlock.indexOf('cameras.main.shake')).toBeGreaterThan(-1);
     expect(hitBlock.indexOf("'!'")).toBeGreaterThan(-1);
@@ -122,6 +172,19 @@ describe('ActionScene — feedback del tap (SPEC §4.2/§7.2)', () => {
     expect(missBlock).not.toContain('actionReducer');
   });
 
+  it('Fase 3: swing del bastón (N2) y near-miss con hop de esquiva, sin castigo', () => {
+    const sceneBlock = source.slice(source.indexOf('private onHit('));
+    expect(sceneBlock.indexOf('playCaneSwing')).toBeGreaterThan(-1);
+    expect(source).toContain('onNearMiss');
+    expect(source).toContain('NEAR_MISS_HOP');
+  });
+
+  it('Fase 3: los taps sobre JEKYLL dan feedback amable y no suman golpes', () => {
+    expect(source).toContain('onJekyllTap');
+    expect(source).toContain('showJekyllNotice');
+    expect(source).toContain('JEKYLL_MISS_NOTICE');
+  });
+
   it('la niña «sale corriendo asustada pero ilesa»: estallido + reaparición', () => {
     const scareBlock = source.slice(source.indexOf('scareGirl()'));
     expect(scareBlock.indexOf('setVisible(false)')).toBeGreaterThan(-1);
@@ -133,12 +196,19 @@ describe('ActionScene — feedback del tap (SPEC §4.2/§7.2)', () => {
     expect(goalBlock.indexOf('this.tweens.add')).toBeGreaterThan(-1);
     expect(goalBlock.indexOf('fleeX')).toBeGreaterThan(-1);
   });
+
+  it('Fase 3: caída final (N2/N3) y línea de victoria (N2) animadas desde DATOS', () => {
+    expect(source).toContain('playFall');
+    expect(source).toContain('showVictoryLine');
+    expect(source).toContain('playTransformAnimation');
+    expect(source).toContain('playEntrance');
+  });
 });
 
 describe('ActionScene — perf desde el día 1 (PLAN Etapa 4)', () => {
-  it('fondo por ParallaxField con la tabla ACTION_PARALLAX_LAYERS', () => {
+  it('fondo por ParallaxField con la tabla de fondos por mecánica (Fase 3)', () => {
     expect(source).toContain('ParallaxField');
-    expect(source).toContain('ACTION_PARALLAX_LAYERS');
+    expect(source).toContain('ACTION_BACKGROUNDS');
   });
 
   it('pool de puffs acotado (PUFF_POOL_SIZE, sin crear sprites por tap)', () => {
@@ -165,5 +235,127 @@ describe('ActionScene — perf desde el día 1 (PLAN Etapa 4)', () => {
     expect(source).toContain('new Hud(this');
     expect(source).toContain('hud.setHits');
     expect(source).toContain('hud.setTimeLeft');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Fase 3 — las REGLAS de las mecánicas nuevas (reducers puros + datos reales
+// de level2/level3): el comportamiento que la escena refleja, testeado sin
+// Phaser (los fakes estructurales de arriba validan el cableado).
+// ---------------------------------------------------------------------------
+
+describe('ActionScene — N2 cane-strike: la tanda de level2 arranca y gana bien', () => {
+  const config = level2.action as CaneStrikeActionConfig;
+  expect(config.mechanic).toBe('cane-strike');
+  const roundConfig = {
+    goal: config.goal,
+    timeLimitSec: config.timeLimitSec,
+    fallMs: 900,
+    lineMs: 1600,
+  };
+  const hit: CaneEvent = { type: 'hit' };
+
+  it('level2 inicia en fase correcta: playing, meta 5/5, timer de 60 s', () => {
+    const state = initialCaneState(roundConfig);
+    expect(state.phase).toBe(CanePhase.Playing);
+    expect(state).toMatchObject({ hits: 0, goal: 5, timeLeftMs: 60000 });
+  });
+
+  it('el 5.º bastonazo dispara la caída (falling) con el timer congelado', () => {
+    let state = initialCaneState(roundConfig);
+    for (let i = 0; i < 4; i++) {
+      state = caneReducer(state, hit);
+      expect(state.phase).toBe(CanePhase.Playing);
+    }
+    state = caneReducer(state, hit);
+    expect(state.hits).toBe(5);
+    expect(state.phase).toBe(CanePhase.Falling);
+    expect(state.timeLeftMs).toBe(60000); // congelado para el bonus
+    // La secuencia avanza sola: falling → line → goal (→ QUIZ en la escena).
+    state = caneReducer(state, { type: 'advance' });
+    expect(state.phase).toBe(CanePhase.Line);
+    state = caneReducer(state, { type: 'advance' });
+    expect(state.phase).toBe(CanePhase.Goal);
+  });
+
+  it('el bonus de la meta usa el tiempo congelado (2 pts/s, igual que N1)', () => {
+    let state = initialCaneState(roundConfig);
+    for (let i = 0; i < 5; i++) state = caneReducer(state, hit);
+    state = caneReducer(state, { type: 'tick', dtMs: 20000 });
+    expect(state.timeLeftMs).toBe(60000); // en falling el timer NO corre
+    state = caneReducer(state, { type: 'advance' });
+    state = caneReducer(state, { type: 'advance' });
+    expect(state.phase).toBe(CanePhase.Goal);
+    expect(timeBonus(state.timeLeftMs)).toBe(120);
+  });
+});
+
+describe('ActionScene — N3 transform-target: Hyde suma, Jekyll no', () => {
+  const config = level3.action as TransformTargetActionConfig;
+  expect(config.mechanic).toBe('transform-target');
+  const roundConfig = {
+    goal: config.goal,
+    timeLimitSec: config.timeLimitSec,
+    revertMs: config.revertMs,
+    fallMs: 900,
+  };
+  const hit: TransformEvent = { type: 'hit' };
+  const start: TransformEvent = { type: 'start' };
+
+  function playingState(): ReturnType<typeof initialTransformState> {
+    // intro → start → ready → primer tick → playing (como la escena).
+    let state = initialTransformState(roundConfig);
+    state = transformReducer(state, start);
+    state = transformReducer(state, { type: 'tick', dtMs: 16 });
+    expect(state.phase).toBe(TransformPhase.Playing);
+    return state;
+  }
+
+  it('level3 nace en fase intro (el timer NO corre durante la cinemática)', () => {
+    const state = initialTransformState(roundConfig);
+    expect(state.phase).toBe(TransformPhase.Intro);
+    expect(state.form).toBe(TargetForm.Hyde);
+    const afterTicks = transformReducer(state, { type: 'tick', dtMs: 3000 });
+    expect(afterTicks.phase).toBe(TransformPhase.Intro);
+    expect(afterTicks.timeLeftMs).toBe(90000); // parado
+  });
+
+  it('un golpe a Hyde sube el contador y abre la ventana Jekyll EXACTA', () => {
+    let state = playingState();
+    state = transformReducer(state, hit);
+    expect(state.hits).toBe(1);
+    expect(state.form).toBe(TargetForm.Jekyll);
+    expect(state.revertInMs).toBe(3000); // revertMs de level3, exacto
+    state = transformReducer(state, { type: 'tick', dtMs: 2999 });
+    expect(state.form).toBe(TargetForm.Jekyll); // aún en ventana
+    state = transformReducer(state, { type: 'tick', dtMs: 1 });
+    expect(state.form).toBe(TargetForm.Hyde); // revierte a los 3000 ms justos
+    expect(state.revertInMs).toBe(0);
+  });
+
+  it('un golpe a Jekyll NO sube el contador (miss pedagógico, sin castigo)', () => {
+    let state = playingState();
+    state = transformReducer(state, hit); // ahora es Jekyll
+    const jekyllState = state;
+    expect(transformReducer(state, hit)).toBe(jekyllState); // idempotente
+    expect(transformReducer(state, { type: 'miss' })).toBe(jekyllState);
+    expect(jekyllState.hits).toBe(1);
+  });
+
+  it('meta 6/6: Hyde cae (falling) y la tanda termina en goal → QUIZ', () => {
+    let state = playingState();
+    for (let i = 0; i < 5; i++) {
+      state = transformReducer(state, hit);
+      state = transformReducer(state, { type: 'tick', dtMs: 3000 }); // ventana fuera
+    }
+    expect(state.hits).toBe(5);
+    state = transformReducer(state, hit);
+    expect(state.hits).toBe(6);
+    expect(state.phase).toBe(TransformPhase.Falling);
+    expect(state.form).toBe(TargetForm.Hyde); // cae SIENDO Hyde
+    state = transformReducer(state, { type: 'tick', dtMs: 900 });
+    expect(state.phase).toBe(TransformPhase.Goal);
+    // Bonus por tiempo, misma fórmula que N1/N2.
+    expect(timeBonus(state.timeLeftMs)).toBeGreaterThan(0);
   });
 });

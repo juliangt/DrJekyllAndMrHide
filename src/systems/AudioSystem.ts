@@ -340,6 +340,31 @@ export class AudioSystem {
   }
 
   /**
+   * Golpe de puerta (Fase 3, N3 «asedio al laboratorio»): thump MUY grave y
+   * seco — el cuerpo hueco del roble recibiendo el porrazo de Poole. Seno
+   * grave que cae rápido (más seco que `thump`) con ataque corto para que
+   * lea como golpe, no como tono; suena 3–4 veces durante la intro de la
+   * escena, así que el volumen queda por debajo del thump del hit.
+   */
+  knock(durationSec = 0.16, fromHz = 95, toHz = 40): void {
+    const ctx = this.playableContext();
+    if (!ctx) return;
+    const t0 = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(fromHz, t0);
+    osc.frequency.exponentialRampToValueAtTime(Math.max(toHz, 1), t0 + durationSec);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.linearRampToValueAtTime(MASTER_GAIN, t0 + 0.012); // ataque de golpe
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + durationSec);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(t0);
+    osc.stop(t0 + durationSec);
+  }
+
+  /**
    * Contexto válido para sonar: ya desbloqueado Y sin mute. En cualquier
    * otro caso devuelve `null` → la primitiva es no-op SIN crear fuentes.
    */
