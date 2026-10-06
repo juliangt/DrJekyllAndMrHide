@@ -67,11 +67,13 @@ describe('menuButtonsFor — qué botones mostrar (SPEC §6/§11)', () => {
     expect(labels).toEqual(['Comenzar el viaje', 'Cómo jugar', 'Continuar']);
   });
 
-  it('«Comenzar» y «Continuar» navegan a INTRO (cinemática pre-nivel); «Cómo jugar» no navega', () => {
+  it('«Comenzar» navega a INTRO (cinemática SOLO en partida nueva); «Continuar» va DIRECTO a NARRATIVE; «Cómo jugar» no navega', () => {
     const buttons = menuButtonsFor({ inProgress: true });
     const byId = new Map(buttons.map((b) => [b.id, b]));
     expect(byId.get(MenuButtonId.Start)?.target).toBe(SceneKey.INTRO);
-    expect(byId.get(MenuButtonId.Continue)?.target).toBe(SceneKey.INTRO);
+    // Fase 4: reanudar salta la intro — el nivel lo pasa MenuScene desde
+    // save.currentLevel (el descriptor es el dato; el payload, la escena).
+    expect(byId.get(MenuButtonId.Continue)?.target).toBe(SceneKey.NARRATIVE);
     expect(byId.get(MenuButtonId.HowToPlay)?.target).toBeUndefined();
   });
 
@@ -81,12 +83,19 @@ describe('menuButtonsFor — qué botones mostrar (SPEC §6/§11)', () => {
   });
 });
 
-describe('beginJourney — «Comenzar» marca inProgress (SPEC §11)', () => {
+describe('beginJourney — «Comenzar» marca inProgress Y reinicia el checkpoint (SPEC §11 + Fase 4)', () => {
   it('marca la partida en curso vía SaveSystem', () => {
     const save = new SaveSystem(new FakeStorage());
     expect(save.inProgress).toBe(false);
     beginJourney(save);
     expect(save.inProgress).toBe(true);
+  });
+
+  it('una partida NUEVA siempre arranca en el nivel 1 (descarta el checkpoint previo)', () => {
+    const save = new SaveSystem(new FakeStorage());
+    save.setCurrentLevel(2); // tanda anterior detenida en el N2
+    beginJourney(save);
+    expect(save.currentLevel).toBe(1);
   });
 
   it('tras comenzar, el menú mostraría «Continuar»', () => {
@@ -100,6 +109,7 @@ describe('beginJourney — «Comenzar» marca inProgress (SPEC §11)', () => {
     beginJourney(new SaveSystem(storage));
     const reloaded = new SaveSystem(storage);
     expect(reloaded.inProgress).toBe(true);
+    expect(reloaded.currentLevel).toBe(1);
   });
 });
 

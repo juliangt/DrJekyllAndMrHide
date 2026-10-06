@@ -11,20 +11,24 @@
  * SHUTDOWN — al cambiar de escena debe desaparecer).
  *
  * Reglas de la etapa:
+ *  - VICTORY es el FINAL DE LA OBRA (Fase 4): solo se alcanza con la salida
+ *    correcta del quiz del ÚLTIMO nivel (`nextAfterQuiz`), así que entra con
+ *    {levelId: 3} y `markLevelComplete(finalScore, 3)` cierra el arco.
  *  - Al entrar lee el score/desglose de la tanda (VICTORY llega con
  *    {levelId} desde QUIZ) y el `lastScore` PREVIO del save ANTES de
  *    marcar (el orden decide si el rótulo es «¡Nuevo récord!»).
- *  - `markLevelComplete(finalScore)` UNA sola vez por entrada (guard
+ *  - `markLevelComplete(finalScore, levelId)` UNA sola vez por entrada (guard
  *    anti-reentrado; el método ya es idempotente: récord = máx):
- *    levelsCompleted = 1, lastScore = récord, inProgress = false → tras
- *    ganar «Continuar» NO reaparece en Menu (menuButtonsFor condicional).
+ *    levelsCompleted = nivel real, lastScore = récord, inProgress = false →
+ *    tras ganar «Continuar» NO reaparece en Menu (menuButtonsFor condicional).
  *  - Diploma: marco pergamino CLARO (mismo `ui/Modal` que la carta del
  *    quiz) + sello de cera púrpura (textura `wax-seal`), felicitación
- *    amable 10+; nombre opcional: si queda vacío el diploma dice
- *    «Valiente lector/a».
- *  - «Jugar de nuevo»: resetea la TANDA (total + desglose por categorías)
- *    y vuelve a NARRATIVE con {levelId} — el récord vive en el save y se
- *    conserva. «Volver al inicio»: transición a MENU.
+ *    amable 10+ por haber leído y demostrado la obra COMPLETA; nombre
+ *    opcional: si queda vacío el diploma dice «Valiente lector/a».
+ *  - «Jugar de nuevo»: resetea la TANDA (total + desglose por categorías),
+ *    reinicia el checkpoint al NIVEL 1 (`setCurrentLevel(1)`) y vuelve a
+ *    NARRATIVE {levelId: 1} — el récord vive en el save y se conserva.
+ *    «Volver al inicio»: transición a MENU.
  *  - Sonido de entrada: arpegio mayor del AudioSystem (SPEC §8, suficiente
  *    como fanfarria corta; no-op si el audio está bloqueado o en mute).
  */
@@ -40,6 +44,7 @@ import type { AudioSystem } from '../systems/AudioSystem';
 import type { SaveSystem } from '../systems/SaveSystem';
 import type { ScoreSystem } from '../systems/ScoreSystem';
 import type { LevelConfig } from '../config/levels/types';
+import { FIRST_LEVEL_ID } from '../config/levels';
 import { fadeIn, transitionTo } from './sceneNav';
 import { Modal } from '../ui/Modal';
 import { GothicButton } from '../ui/GothicButton';
@@ -428,9 +433,10 @@ export class VictoryScene extends Phaser.Scene {
   }
 
   /**
-   * «Jugar de nuevo»: descarta la TANDA (reset total + desglose por
-   * categorías) y vuelve a NARRATIVE con {levelId}. El récord vive en el
-   * save (lastScore = máx) y se conserva (SPEC §11).
+   * «Jugar de nuevo» (Fase 4): descarta la TANDA (reset total + desglose
+   * por categorías) y re-abre la obra desde el PRIMER nivel: checkpoint a 1
+   * (`setCurrentLevel(FIRST_LEVEL_ID)`) y NARRATIVE {levelId: 1}. El récord
+   * vive en el save (lastScore = máx) y se conserva (SPEC §11).
    */
   private onPlayAgain(): void {
     if (this.exiting) {
@@ -438,7 +444,8 @@ export class VictoryScene extends Phaser.Scene {
     }
     this.exiting = true;
     this.systems.scoreSystem.reset();
-    transitionTo(this, SceneKey.NARRATIVE, { levelId: this.level.id });
+    this.systems.saveSystem.setCurrentLevel(FIRST_LEVEL_ID);
+    transitionTo(this, SceneKey.NARRATIVE, { levelId: FIRST_LEVEL_ID });
   }
 
   /**

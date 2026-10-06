@@ -80,13 +80,23 @@ describe('VictoryScene — save del SPEC §11 (una sola vez, con guard)', () => 
 });
 
 describe('VictoryScene — botones del PLAN (rejugar / inicio)', () => {
-  it('«Jugar de nuevo»: scoreSystem.reset() ANTES de volver a NARRATIVE con {levelId}', () => {
+  it('«Jugar de nuevo» (Fase 4): checkpoint al NIVEL 1 y reset de tanda ANTES de NARRATIVE {levelId: FIRST_LEVEL_ID}', () => {
     const playBlock = source.slice(source.indexOf('private onPlayAgain('));
     const resetAt = playBlock.indexOf('scoreSystem.reset()');
-    const transitionAt = playBlock.indexOf("transitionTo(this, SceneKey.NARRATIVE, { levelId: this.level.id })");
+    const checkpointAt = playBlock.indexOf('setCurrentLevel(FIRST_LEVEL_ID)');
+    const transitionAt = playBlock.indexOf(
+      'transitionTo(this, SceneKey.NARRATIVE, { levelId: FIRST_LEVEL_ID })',
+    );
     expect(resetAt).toBeGreaterThan(-1);
+    expect(checkpointAt).toBeGreaterThan(-1);
     expect(transitionAt).toBeGreaterThan(-1);
-    expect(resetAt).toBeLessThan(transitionAt);
+    // El save recuerda el nivel ANTES de la transición; la tanda se descarta.
+    expect(checkpointAt).toBeGreaterThan(resetAt);
+    expect(transitionAt).toBeGreaterThan(checkpointAt);
+  });
+
+  it('VICTORY marca el nivel REAL (markLevelComplete(score, levelId) — el 3 al completar el arco)', () => {
+    expect(source).toContain('markLevelComplete(finalScore, this.level.id)');
   });
 
   it('«Volver al inicio»: transición a MENU (sin «Continuar» tras ganar, SPEC §6/§11)', () => {

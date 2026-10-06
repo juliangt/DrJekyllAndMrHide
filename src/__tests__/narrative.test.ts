@@ -19,6 +19,8 @@
  *    alfas de niebla, farolas en exteriores, mesa+frascos en el laboratorio).
  */
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import {
   LORE_BACKGROUNDS,
   NARRATIVE_INTRO_RETOLD_PANELS,
@@ -209,6 +211,26 @@ describe('narrativeStartIndex — arranque de la narrativa según el origen', ()
     expect(narrativeStartIndex(true, 1)).toBe(0);
     expect(narrativeStartIndex(true, 3)).toBe(2);
     expect(narrativeStartIndex(true, 0)).toBe(0);
+  });
+});
+
+describe('fromIntro — SOLO la cinemática lo pasa (Fase 4: N2/N3 arrancan SIEMPRE en panel 0)', () => {
+  const readSource = (relativePath: string): string =>
+    readFileSync(resolve(process.cwd(), relativePath), 'utf8');
+
+  it('NarrativeScene decide el arranque por scene-start data (fromIntro ?? false → panel 0 por defecto)', () => {
+    const sceneSource = readSource('src/scenes/NarrativeScene.ts');
+    expect(sceneSource).toContain('narrativeStartIndex(data.fromIntro ?? false, total)');
+  });
+
+  it('la ÚNICA llamada con fromIntro:true es el cierre de IntroScene (→ N1 con paneles 1–3 contados)', () => {
+    expect(readSource('src/scenes/IntroScene.ts')).toContain('fromIntro: true');
+  });
+
+  it('ninguna OTRA escena pasa fromIntro: la narrativa de N2/N3 (quiz→N, continuar) empieza completa', () => {
+    for (const scene of ['MenuScene', 'ActionScene', 'QuizScene', 'VictoryScene']) {
+      expect(readSource(`src/scenes/${scene}.ts`), scene).not.toContain('fromIntro');
+    }
   });
 });
 

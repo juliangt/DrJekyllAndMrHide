@@ -271,7 +271,7 @@ describe('DoD 6 — persistencia (progreso + mute; corrupto → defaults)', () =
     storage.setItem(SAVE_KEY, '{corrupto');
     expect(() => new SaveSystem(storage)).not.toThrow();
     expect(new SaveSystem(storage).getData()).toEqual({
-      levelsCompleted: 0, lastScore: 0, muted: false, inProgress: false,
+      levelsCompleted: 0, lastScore: 0, muted: false, inProgress: false, currentLevel: 1,
     });
   });
 });

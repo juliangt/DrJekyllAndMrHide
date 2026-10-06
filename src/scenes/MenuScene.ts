@@ -8,11 +8,10 @@
  *    UnifrakturCook (clave CSS, cargada en PRELOAD) + subtítulo del SPEC §6.
  *  - Botones GothicButton desde `menuButtonsFor(save)`: «Comenzar el viaje»,
  *    «Cómo jugar» y «Continuar» SOLO si `save.inProgress` (SPEC §11).
- *    v1: «Comenzar» y «Continuar» van AMBOS a INTRO (la cinemática de
- *    Jekyll → Hyde corre «antes de arrancar el primer nivel» y desemboca en
- *    la narrativa del N1); «Comenzar» además marca `inProgress = true` para
- *    que «Continuar» aparezca en la próxima visita (SPEC §11: se guarda al
- *    comenzar nivel).
+ *    Fase 4 del multi-nivel: «Comenzar» marca `inProgress` + checkpoint 1
+ *    (`beginJourney`) y pasa por la INTRO — la cinemática SOLO se ve al
+ *    empezar una partida nueva; «Continuar» va DIRECTO a NARRATIVE con
+ *    `{ levelId: save.currentLevel }` (sin intro, SPEC §11).
  *  - Overlay «Cómo jugar» (3 pasos con iconos procedurales, `HOW_TO_PLAY`)
  *    cerrable con botón «Cerrar».
  *  - Toggle de mute (icono altavoz on/off): persiste vía SaveSystem y
@@ -164,16 +163,19 @@ export class MenuScene extends Phaser.Scene {
     audioSystem.blip();
     if (id === MenuButtonId.Start) {
       // SPEC §11: guardar al comenzar nivel → «Continuar» visible después.
+      // Fase 4: beginJourney también reinicia el checkpoint al NIVEL 1
+      // (partida nueva: descarta el nivel guardado de una tanda anterior).
       beginJourney(saveSystem);
-      // Ambos arranques pasan por la cinemática de introducción (Jekyll →
-      // Hyde), que a su vez desemboca en la narrativa del N1.
+      // La cinemática (Jekyll → Hyde) SOLO se ve con «Comenzar»: desemboca
+      // en la narrativa del N1, arrancando tras los paneles que ya contó.
       transitionTo(this, SceneKey.INTRO);
       return;
     }
     if (id === MenuButtonId.Continue) {
-      // v1: reanudar = ver la intro + narrativa del N1 (sin checkpoint por
-      // panel todavía); la intro es el «antes de arrancar el primer nivel».
-      transitionTo(this, SceneKey.INTRO);
+      // Fase 4: reanudar = narrativa del nivel GUARDADO (`currentLevel`),
+      // SIN reproducir la intro. El quiz fallido (D5) y la pausa no tocan el
+      // checkpoint, así que siempre retoma donde estaba la tanda.
+      transitionTo(this, SceneKey.NARRATIVE, { levelId: saveSystem.currentLevel });
       return;
     }
     if (id === MenuButtonId.HowToPlay) {

@@ -12,6 +12,11 @@
  * Etapa 3 — ídem con `wipeTo` (fade + cortina de niebla, SPEC §7.2): datos
  * del wipe (`FOG_WIPE_DEFAULTS`), cortina+tweens con fakes, y el guard de
  * reentrada COMPARTIDO con transitionTo.
+ *
+ * Fase 4 del multi-nivel — la salida correcta del QUIZ es CONDICIONAL:
+ * `hasNextLevel`/`nextAfterQuiz` (datos puros contra el registro LEVELS)
+ * deciden NARRATIVE {N+1} vs VICTORY; el mapa NEXT_SCENE[QUIZ] queda como
+ * fallback final.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -21,6 +26,8 @@ import {
   FADE_DURATION_MS,
   FOG_WIPE_DEFAULTS,
   NEXT_SCENE,
+  hasNextLevel,
+  nextAfterQuiz,
   nextSceneKey,
   transitionTo,
   wipeTo,
@@ -28,6 +35,7 @@ import {
 import type Phaser from 'phaser';
 import { SceneKey } from '../config/sceneKeys';
 import { TEXTURE_KEYS } from '../art/textures';
+import { LEVELS } from '../config/levels';
 
 describe('SceneKey — las 9 claves del flujo (SPEC §3 + intro pre-nivel)', () => {
   it('tiene exactamente BOOT, PRELOAD, MENU, INTRO, NARRATIVE, ACTION, GAME_OVER, QUIZ, VICTORY', () => {
@@ -67,7 +75,9 @@ describe('NEXT_SCENE — cadena principal (SPEC §3)', () => {
     expect(NEXT_SCENE[SceneKey.ACTION]).toBe(SceneKey.QUIZ);
   });
 
-  it('QUIZ (correcta) → VICTORY', () => {
+  it('QUIZ (correcta) → VICTORY es el FALLBACK FINAL: el destino real lo decide nextAfterQuiz(levelId)', () => {
+    // Fase 4 del multi-nivel: la salida correcta del quiz es CONDICIONAL —
+    // NARRATIVE del nivel siguiente si existe; VICTORY solo tras el último.
     expect(NEXT_SCENE[SceneKey.QUIZ]).toBe(SceneKey.VICTORY);
   });
 
@@ -115,6 +125,36 @@ describe('ALT_TRANSITIONS — salidas condicionales (SPEC §3)', () => {
       from: SceneKey.ACTION,
       to: SceneKey.GAME_OVER,
     });
+  });
+});
+
+describe('nextAfterQuiz / hasNextLevel — progresión multi-nivel (Fase 4)', () => {
+  it('QUIZ correcto del N1 → NARRATIVE (la narrativa del NIVEL 2)', () => {
+    expect(hasNextLevel(1)).toBe(true);
+    expect(nextAfterQuiz(1)).toBe(SceneKey.NARRATIVE);
+  });
+
+  it('QUIZ correcto del N2 → NARRATIVE (la narrativa del NIVEL 3)', () => {
+    expect(hasNextLevel(2)).toBe(true);
+    expect(nextAfterQuiz(2)).toBe(SceneKey.NARRATIVE);
+  });
+
+  it('QUIZ correcto del N3 (último del arco) → VICTORY (final de la obra)', () => {
+    expect(hasNextLevel(3)).toBe(false);
+    expect(nextAfterQuiz(3)).toBe(SceneKey.VICTORY);
+  });
+
+  it('la regla se decide contra el REGISTRO LEVELS (agregar un N4 extiende el flujo sin tocar escenas)', () => {
+    // hasNextLevel pregunta por getLevel(levelId + 1): si algún día se
+    // registra un nivel 4, nextAfterQuiz(3) pasaría a NARRATIVE solo.
+    for (const level of LEVELS) {
+      expect(hasNextLevel(level.id)).toBe(level.id < LEVELS.length);
+    }
+  });
+
+  it('un id sin nivel siguiente registrado no ofrece avance (fallback VICTORY)', () => {
+    expect(hasNextLevel(99)).toBe(false);
+    expect(nextAfterQuiz(99)).toBe(SceneKey.VICTORY);
   });
 });
 

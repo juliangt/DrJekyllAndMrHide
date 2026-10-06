@@ -13,6 +13,13 @@ import type { LevelConfig } from './types';
 export const LEVELS: readonly LevelConfig[] = [level1, level2, level3];
 
 /**
+ * Id del PRIMER nivel del arco: el destino de «Comenzar el viaje», de
+ * «Jugar de nuevo» tras la victoria y del fallback grácil de
+ * `activeLevelFor` (toda tanda nueva empieza aquí).
+ */
+export const FIRST_LEVEL_ID: number = LEVELS[0].id;
+
+/**
  * Devuelve el nivel con ese `id`, o `undefined` si no está registrado.
  * (v1.1: `getLevel(1|2|3)` cubren el arco completo del juego.)
  */

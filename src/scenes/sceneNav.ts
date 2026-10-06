@@ -8,16 +8,26 @@
  * solo importa Phaser como TIPO y los helpers (`transitionTo`, `wipeTo`)
  * se ejercitan con fakes estructurales en tests y en el navegador.
  *
- * Grafo (SPEC §3, con la intro pre-nivel de la cinemática):
+ * Grafo (SPEC §3, Fase 4 del multi-nivel — la intro SOLO con «Comenzar»):
  *
- *   BOOT → PRELOAD → MENU → INTRO → NARRATIVE → ACTION → QUIZ ─✔→ VICTORY → MENU
- *                                ▲        timeout│  │            │
- *                                └── ✘ (D5) ──────┘  └─ ✘ → NARRATIVE (reinicio nivel)
- *                                          ACTION ← GAME_OVER (overlay «Reintentar»)
+ *   BOOT → PRELOAD → MENU ─«Comenzar»→ INTRO (fromIntro) ─┐
+ *            └───«Continuar» (sin intro, nivel guardado)──┤
+ *                                                         ▼
+ *                     NARRATIVE {N} → ACTION {N} → QUIZ {N}
+ *                        ▲ timeout│           │ ✔ correcto (nextAfterQuiz)
+ *                        │        │           ├─ hay N+1 → NARRATIVE {N+1}
+ *                        └─ ✘ (D5)─┘          └─ N era el último → VICTORY
+ *                  ACTION ← GAME_OVER (overlay «Reintentar»)
  *
- * NOTA — la intro SOLO se reproduce saliendo del menú (MENU → INTRO, «antes
- * de arrancar el primer nivel»): las aristas alternativas NO cambian — el
- * quiz fallido sigue yendo DIRECTO a NARRATIVE sin reproducirla.
+ *   VICTORY (final de la obra, solo tras el nivel 3) → MENU («Volver al
+ *   inicio»); «Jugar de nuevo» re-abre NARRATIVE {1} (tanda nueva).
+ *
+ * NOTA — la intro SOLO se reproduce con «Comenzar el viaje» (MENU → INTRO):
+ * las aristas alternativas NO la reproducen — ni el quiz fallido (D5), ni
+ * «Continuar», que va DIRECTO a la narrativa del nivel guardado.
+ *
+ * La salida correcta del quiz es CONDICIONAL (Fase 4): la decide
+ * `nextAfterQuiz(levelId)` (abajo), probada contra el registro `LEVELS`.
  */
 
 import type Phaser from 'phaser';
@@ -31,21 +41,24 @@ import {
 } from '../config/palette';
 import { TEXTURE_KEYS } from '../art/textures';
 import { SceneKey, type SceneKey as SceneKeyType } from '../config/sceneKeys';
+import { getLevel } from '../config/levels';
 
 /**
  * Cadena principal del flujo: para cada escena, su salida por defecto.
- * `QUIZ` apunta a `VICTORY` porque en v1 la única salida correcta del quiz
- * es la victoria; `VICTORY` vuelve a `MENU` («Volver al inicio»).
+ * `QUIZ` apunta a `VICTORY` como FALLBACK FINAL (el destino real de la
+ * salida correcta lo decide `nextAfterQuiz(levelId)`: la narrativa del
+ * nivel siguiente si existe — VICTORY solo se alcanza tras el ÚLTIMO nivel).
+ * `VICTORY` vuelve a `MENU` («Volver al inicio»).
  */
 export const NEXT_SCENE: Readonly<Record<SceneKeyType, SceneKeyType>> = {
   [SceneKey.BOOT]: SceneKey.PRELOAD,
   [SceneKey.PRELOAD]: SceneKey.MENU,
-  [SceneKey.MENU]: SceneKey.INTRO, // la intro solo se ve al salir del menú
-  [SceneKey.INTRO]: SceneKey.NARRATIVE, // fin de la cinemática → narrativa del N1
+  [SceneKey.MENU]: SceneKey.INTRO, // la intro solo se ve con «Comenzar el viaje»
+  [SceneKey.INTRO]: SceneKey.NARRATIVE, // fin de la cinemática → narrativa del N1 (fromIntro)
   [SceneKey.NARRATIVE]: SceneKey.ACTION,
   [SceneKey.ACTION]: SceneKey.QUIZ, // meta 3/3 alcanzada
   [SceneKey.GAME_OVER]: SceneKey.ACTION, // «Reintentar»: SOLO el minijuego
-  [SceneKey.QUIZ]: SceneKey.VICTORY, // respuesta correcta
+  [SceneKey.QUIZ]: SceneKey.VICTORY, // correcta: fallback final (vía nextAfterQuiz)
   [SceneKey.VICTORY]: SceneKey.MENU, // «Volver al inicio» / rejugar
 };
 
@@ -56,6 +69,28 @@ export const ALT_TRANSITIONS = {
   /** Timeout del minijuego → overlay GAME_OVER (dentro de ActionScene). */
   actionTimeout: { from: SceneKey.ACTION, to: SceneKey.GAME_OVER },
 } as const satisfies Record<string, { from: SceneKeyType; to: SceneKeyType }>;
+
+// ---- Progresión multi-nivel (Fase 4, datos puros contra el registro) --------
+
+/**
+ * ¿Hay nivel registrado DESPUÉS de `levelId`? Decide la arista correcta del
+ * quiz contra el registro `LEVELS` (config/levels): puro y testeable sin
+ * Phaser — agregar un nivel 4 a `LEVELS` extiende el flujo sin tocar escenas.
+ */
+export function hasNextLevel(levelId: number): boolean {
+  return getLevel(levelId + 1) !== undefined;
+}
+
+/**
+ * Destino del QUIZ CORRECTO del nivel `levelId` (Fase 4 del multi-nivel):
+ * la NARRATIVE del nivel SIGUIENTE si existe (el quiz correcto del N1 lleva
+ * a la narrativa del N2; del N2 al N3); VICTORY — el final de la obra — SOLO
+ * tras el último nivel registrado. (La salida INCORRECTA es la arista
+ * `quizWrong`: reinicio del MISMO nivel, D5.)
+ */
+export function nextAfterQuiz(levelId: number): SceneKeyType {
+  return hasNextLevel(levelId) ? SceneKey.NARRATIVE : SceneKey.VICTORY;
+}
 
 /** Siguiente escena de la cadena principal (útil para no exponer el mapa). */
 export function nextSceneKey(from: SceneKeyType): SceneKeyType {

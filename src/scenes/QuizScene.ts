@@ -12,12 +12,16 @@
  *  - Nivel activo por scene-start data `{ levelId }` (desde ACTION, default 1).
  *  - Opción CORRECTA → `scoreSystem.add(QUIZ_POINTS)` (+100, SPEC §5) →
  *    arpegio mayor (SPEC §8) → carta antigua con `storyFragment` (SPEC §4.4)
- *    → «Continuar» → VICTORY con {levelId}.
+ *    → «Continuar» → PROGRESIÓN MULTI-NIVEL (Fase 4, `nextAfterQuiz`): si
+ *    hay nivel siguiente, el save lo registra como checkpoint
+ *    (`setCurrentLevel(N+1)`) y se va a SU narrativa con {levelId: N+1};
+ *    si el nivel era el ÚLTIMO, VICTORY (final de la obra) con {levelId}.
  *  - Opción INCORRECTA → se deshabilitan TODAS las tarjetas → intervalo
  *    menor descendente (SPEC §8) → feedback pedagógico de ESA opción en
  *    placa de error desaturado → «Volver a empezar el nivel» →
  *    `scoreSystem.reset()` (D5: descarte de la tanda) → NARRATIVE con
- *    {levelId} (skip disponible allí). El save MANTIENE `inProgress = true`.
+ *    {levelId} (skip disponible allí). El save MANTIENE `inProgress = true`
+ *    y NO toca `currentLevel`: reinicia el MISMO nivel.
  *  - «Nunca se cierra sin feedback» (SPEC §6): el modal no tiene cierre; las
  *    únicas salidas pasan por las fases `feedback-wrong` / `story` del
  *    reducer (estructura de fases lo garantiza, testeada).
@@ -49,7 +53,7 @@ import {
   type QuizBoardLayout,
   type QuizState,
 } from '../gameplay/quizState';
-import { fadeIn, transitionTo } from './sceneNav';
+import { fadeIn, hasNextLevel, transitionTo } from './sceneNav';
 import { Modal } from '../ui/Modal';
 import { OptionCard } from '../ui/OptionCard';
 import { GothicButton } from '../ui/GothicButton';
@@ -324,8 +328,9 @@ export class QuizScene extends Phaser.Scene {
         .setOrigin(0.5, 0),
     );
 
-    // «Continuar» → VICTORY con {levelId} (el diploma es la Etapa 6). Como
-    // el botón de reinicio, vive dentro del contenido del modal.
+    // «Continuar» → progresión multi-nivel (nextAfterQuiz): siguiente nivel
+    // o VICTORY. Como el botón de reinicio, vive dentro del contenido del
+    // modal.
     modal.content.add(
       new GothicButton(this, panel.centerX, view.buttonCenterY, {
         label: QUIZ_LABELS.continueStory,
@@ -423,7 +428,7 @@ export class QuizScene extends Phaser.Scene {
       return;
     }
     this.state = next;
-    this.exitToVictory();
+    this.exitAfterCorrect();
   }
 
   /**
@@ -442,12 +447,27 @@ export class QuizScene extends Phaser.Scene {
     transitionTo(this, SceneKey.NARRATIVE, { levelId: this.level.id });
   }
 
-  /** Salida correcta del quiz: VICTORY con {levelId} (SPEC §3/§4.3). */
-  private exitToVictory(): void {
+  /**
+   * Salida correcta del quiz (Fase 4 del multi-nivel, `nextAfterQuiz`):
+   *
+   *  - Si hay nivel siguiente, el CHECKPOINT se actualiza ANTES de
+   *    transicionar (`setCurrentLevel(N+1)`: el punto más robusto — es el
+   *    único lugar donde el flujo AVANZA de nivel; ni el quiz fallido (D5)
+   *    ni la pausa lo tocan) y se va a la NARRATIVE de ese nivel.
+   *  - Si `levelId` era el ÚLTIMO del registro, VICTORY con {levelId}: el
+   *    diploma marca `markLevelComplete(score, 3)` y cierra la partida.
+   */
+  private exitAfterCorrect(): void {
     if (this.exiting) {
       return;
     }
     this.exiting = true;
+    if (hasNextLevel(this.level.id)) {
+      const nextId = this.level.id + 1;
+      this.systems.saveSystem.setCurrentLevel(nextId);
+      transitionTo(this, SceneKey.NARRATIVE, { levelId: nextId });
+      return;
+    }
     transitionTo(this, SceneKey.VICTORY, { levelId: this.level.id });
   }
 }

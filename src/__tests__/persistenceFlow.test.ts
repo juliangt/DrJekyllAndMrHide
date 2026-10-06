@@ -6,15 +6,18 @@
  * MISMO storage (en producción: `localStorage` que sobrevive a la pestaña).
  * Verifica el flujo de vida entero:
  *
- *   partida nueva → comenzar (inProgress=true) → recarga (estado intacto,
- *   «Continuar» visible) → timeout/reintento (no toca el save) → quiz
- *   fallido (D5: la tanda se descarta, el save sigue enProgress) →
- *   completar (markLevelComplete: récord + inProgress=false, «Continuar»
- *   desaparece) → recarga (récord y levelsCompleted intactos)
+ *   partida nueva → comenzar (inProgress=true, checkpoint al N1) → recarga
+ *   (estado intacto, «Continuar» visible) → timeout/reintento (no toca el
+ *   save) → quiz fallido (D5: la tanda se descarta, el save sigue
+ *   inProgress) → completar (markLevelComplete: récord + inProgress=false,
+ *   «Continuar» desaparece) → recarga (récord y levelsCompleted intactos)
  *
- * más los bordes: mute persistente entre instancias, save corrupto a mitad
- * (defaults sin romper, y el juego sigue escribiendo después) y escritura
- * que falla (cuota/modo privado: el juego vive en memoria).
+ * más el flujo MULTI-NIVEL de la Fase 4 (checkpoint `currentLevel`:
+ * avanzar de quiz lo mueve al siguiente nivel; «Continuar» reanuda SIN
+ * intro; el fallo y el timeout no lo tocan) y los bordes: mute persistente
+ * entre instancias, save corrupto a mitad (defaults sin romper, y el juego
+ * sigue escribiendo después) y escritura que falla (cuota/modo privado: el
+ * juego vive en memoria).
  *
  * El wiring con las escenas ya está cubierto por `menuButtonsFor`
  * (menu.test.ts) — aquí se ejercita ESE contrato de punta a punta.
@@ -27,6 +30,7 @@ import {
   type StorageLike,
 } from '../systems/SaveSystem';
 import { beginJourney, menuButtonsFor } from '../config/menu';
+import { SceneKey } from '../config/sceneKeys';
 import { AudioSystem } from '../systems/AudioSystem';
 import { ScoreSystem } from '../systems/ScoreSystem';
 
@@ -138,6 +142,75 @@ describe('ciclo de vida completo del save (recargas simuladas)', () => {
   });
 });
 
+describe('flujo multi-nivel — continuar reanuda el nivel guardado (Fase 4)', () => {
+  it('comenzar (checkpoint 1) → acertar quiz N1 (checkpoint 2) → recarga → «Continuar» reanuda el N2 SIN intro', () => {
+    const storage = new FakeStorage();
+
+    // 1. «Comenzar el viaje» (beginJourney): inProgress + checkpoint al N1.
+    const session1 = new SaveSystem(storage);
+    beginJourney(session1);
+    expect(session1.currentLevel).toBe(1);
+
+    // 2. Quiz correcto del N1 (lo que hace QuizScene.exitAfterCorrect):
+    //    registra el nivel SIGUIENTE como checkpoint antes de transicionar.
+    session1.setCurrentLevel(2);
+
+    // 3. RELOAD: el checkpoint sobrevive y «Continuar» apunta a NARRATIVE
+    //    (sin intro) — MenuScene pasará {levelId: currentLevel}.
+    const session2 = new SaveSystem(storage);
+    expect(session2.inProgress).toBe(true);
+    expect(session2.currentLevel).toBe(2);
+    const continueButton = menuButtonsFor(session2.getData()).find(
+      (b) => b.id === 'continue',
+    );
+    expect(continueButton?.target).toBe(SceneKey.NARRATIVE);
+
+    // 4. Quiz correcto del N2 → checkpoint 3; luego el N3 se completa
+    //    (markLevelComplete con el id REAL de VictoryScene) y cierra.
+    session2.setCurrentLevel(3);
+    const score = new ScoreSystem();
+    score.add(30, 'taps');
+    score.add(100, 'quiz');
+    score.add(84, 'timeBonus');
+    session2.markLevelComplete(score.getScore(), 3);
+
+    // 5. RELOAD final: obra completada — sin «Continuar» y arco cerrado.
+    const session3 = new SaveSystem(storage);
+    expect(session3.inProgress).toBe(false);
+    expect(session3.levelsCompleted).toBe(3);
+    expect(session3.lastScore).toBe(214);
+    expect(menuButtonsFor(session3.getData()).some((b) => b.id === 'continue')).toBe(false);
+  });
+
+  it('quiz fallido (D5) y timeout NO mueven el checkpoint: la tanda se reanuda en el MISMO nivel', () => {
+    const storage = new FakeStorage();
+    const save = new SaveSystem(storage);
+    beginJourney(save);
+    save.setCurrentLevel(2);
+
+    // Quiz fallido → restartLevel(): setInProgress(true), sin setCurrentLevel.
+    save.setInProgress(true);
+    // Timeout → «Reintentar»: ni siquiera toca el save (D6, probado arriba).
+    const reloaded = new SaveSystem(storage);
+    expect(reloaded.currentLevel).toBe(2);
+    expect(reloaded.inProgress).toBe(true);
+  });
+
+  it('«Jugar de nuevo» tras la victoria re-abre el NIVEL 1 (checkpoint reiniciado) y conserva el récord', () => {
+    const storage = new FakeStorage();
+    const save = new SaveSystem(storage);
+    save.setCurrentLevel(3);
+    save.markLevelComplete(214, 3);
+    expect(save.currentLevel).toBe(3);
+
+    // Lo que hace VictoryScene.onPlayAgain(): checkpoint a 1 + tanda nueva.
+    save.setCurrentLevel(1);
+    const reloaded = new SaveSystem(storage);
+    expect(reloaded.currentLevel).toBe(1);
+    expect(reloaded.lastScore).toBe(214); // el récord NUNCA baja
+  });
+});
+
 describe('mute persistente entre instancias (SPEC §8/§11)', () => {
   it('toggle de mute → nueva instancia lo lee y lo conserva', () => {
     const storage = new FakeStorage();
@@ -198,13 +271,20 @@ describe('save corrupto a mitad de partida — defaults sin romper (SPEC §11)',
     const storage = new FakeStorage();
     storage.setItem(
       SAVE_KEY,
-      JSON.stringify({ levelsCompleted: 'uno', lastScore: 150, muted: 'sí', inProgress: true }),
+      JSON.stringify({
+        levelsCompleted: 'uno',
+        lastScore: 150,
+        muted: 'sí',
+        inProgress: true,
+        currentLevel: 'tres',
+      }),
     );
     const reloaded = new SaveSystem(storage);
     expect(reloaded.levelsCompleted).toBe(0); // corrupto → default
     expect(reloaded.lastScore).toBe(150); // intacto
     expect(reloaded.muted).toBe(false); // corrupto → default
     expect(reloaded.inProgress).toBe(true); // intacto
+    expect(reloaded.currentLevel).toBe(1); // corrupto → default (checkpoint 1)
   });
 
   it('setItem que FALLA (cuota/modo privado): el juego sigue con el estado en memoria', () => {

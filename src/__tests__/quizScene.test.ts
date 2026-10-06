@@ -4,8 +4,10 @@
  * cargaría Phaser y jsdom no puede). Se valida el wiring de la capa fina:
  * consume el reducer/layout puros de gameplay/quizState, aplica el +100 con
  * arpegio en la rama correcta, resetea la tanda ANTES de volver a NARRATIVE
- * en la incorrecta (D5), pasa {levelId} en ambas salidas, muestra SOLO el
- * puntaje (sin timer) y nunca ofrece cerrar el modal sin feedback.
+ * en la incorrecta (D5), pasa {levelId} en ambas salidas — la CORRECTA es
+ * multi-nivel (Fase 4): setCurrentLevel(N+1) + NARRATIVE del siguiente, o
+ * VICTORY tras el último —, muestra SOLO el puntaje (sin timer) y nunca
+ * ofrece cerrar el modal sin feedback.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -88,8 +90,23 @@ describe('QuizScene — rama correcta (SPEC §4.3/§5/§8: +100 → arpegio → 
     expect(quizSource).toContain("from '../gameplay/scoring'");
   });
 
-  it('«Continuar» → transición a VICTORY pasando {levelId}', () => {
-    expect(quizSource).toContain('transitionTo(this, SceneKey.VICTORY, { levelId: this.level.id })');
+  it('«Continuar» → progresión multi-nivel: nextAfterQuiz decide el destino (Fase 4)', () => {
+    const exitBlock = quizSource.slice(quizSource.indexOf('private exitAfterCorrect('));
+    expect(exitBlock.indexOf('hasNextLevel(this.level.id)')).toBeGreaterThan(-1);
+    // Hay nivel siguiente: checkpoint al NUEVO nivel ANTES de transicionar
+    // (el save recuerda dónde retomar) y NARRATIVE de ese nivel con {levelId}.
+    expect(exitBlock.indexOf('setCurrentLevel(nextId)')).toBeGreaterThan(-1);
+    const setCurrentAt = exitBlock.indexOf('setCurrentLevel(nextId)');
+    const narrativeAt = exitBlock.indexOf('transitionTo(this, SceneKey.NARRATIVE, { levelId: nextId })');
+    expect(narrativeAt).toBeGreaterThan(-1);
+    expect(setCurrentAt).toBeLessThan(narrativeAt);
+    // Último nivel: VICTORY con {levelId} (final de la obra).
+    expect(exitBlock.indexOf('transitionTo(this, SceneKey.VICTORY, { levelId: this.level.id })')).toBeGreaterThan(-1);
+  });
+
+  it('el destino lo decide el DATO (nextAfterQuiz de sceneNav), no un nivel hardcodeado', () => {
+    expect(quizSource).toContain("import { fadeIn, hasNextLevel, transitionTo } from './sceneNav'");
+    expect(quizSource).not.toContain('exitToVictory'); // sin salidas monolíticas a VICTORY
   });
 
   it('la vista historia renderiza el storyFragment REAL del nivel (carta antigua)', () => {
@@ -127,6 +144,14 @@ describe('QuizScene — rama incorrecta (D5: feedback de ESA opción → reinici
 
   it('el reinicio va a NARRATIVE (nivel completo) pasando {levelId}', () => {
     expect(quizSource).toContain('transitionTo(this, SceneKey.NARRATIVE, { levelId: this.level.id })');
+  });
+
+  it('el reinicio NO toca el checkpoint (D5: reintentar el MISMO nivel, Fase 4)', () => {
+    const restartBlock = quizSource.slice(
+      quizSource.indexOf('private restartLevel('),
+      quizSource.indexOf('private exitAfterCorrect('),
+    );
+    expect(restartBlock.indexOf('saveSystem.setCurrentLevel')).toBe(-1);
   });
 
   it('la vista feedback muestra el feedback de la opción ELEGIDA (no otro)', () => {

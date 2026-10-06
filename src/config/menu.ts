@@ -41,8 +41,11 @@ export interface MenuButtonDescriptor {
 /**
  * Qué botones mostrar (SPEC §6): «Comenzar el viaje» y «Cómo jugar»
  * siempre; «Continuar» SOLO si `save.inProgress === true` (SPEC §11).
- * Ambos arranques navegan a INTRO: la cinemática (Jekyll → Hyde) corre
- * «antes de arrancar el primer nivel» y desemboca en la narrativa del N1.
+ * Destinos (Fase 4 del multi-nivel): «Comenzar» navega a INTRO — la
+ * cinemática (Jekyll → Hyde) SOLO se ve al empezar una partida nueva y
+ * desemboca en la narrativa del N1; «Continuar» va DIRECTO a NARRATIVE
+ * (sin intro) y MenuScene le pasa `{ levelId: save.currentLevel }`, el
+ * checkpoint guardado (el `target` es el dato; el payload lo arma la escena).
  */
 export function menuButtonsFor(save: { inProgress: boolean }): readonly MenuButtonDescriptor[] {
   const buttons: MenuButtonDescriptor[] = [
@@ -57,13 +60,11 @@ export function menuButtonsFor(save: { inProgress: boolean }): readonly MenuButt
     },
   ];
   if (save.inProgress) {
-    // v1: «Continuar» reanuda igual que «Comenzar» (intro + narrativa del N1);
-    // cuando exista checkpoint por nivel, el target pasará a depender del
-    // progreso guardado.
+    // Reanudar = narrativa del nivel guardado, SIN reproducir la intro.
     buttons.push({
       id: MenuButtonId.Continue,
       label: 'Continuar',
-      target: SceneKey.INTRO,
+      target: SceneKey.NARRATIVE,
     });
   }
   return buttons;
@@ -72,15 +73,21 @@ export function menuButtonsFor(save: { inProgress: boolean }): readonly MenuButt
 /** Contrato que «Comenzar» necesita del SaveSystem (lo satisface y los fakes). */
 export interface ProgressStore {
   setInProgress(inProgress: boolean): void;
+  /** Checkpoint de nivel (Fase 4): una partida nueva SIEMPRE arranca en el 1. */
+  setCurrentLevel(levelId: number): void;
 }
 
 /**
  * Acción de «Comenzar el viaje»: marca la partida como en curso para que
  * «Continuar» aparezca en próximas visitas (SPEC §11: se guarda al
- * comenzar nivel). `MenuScene` la invoca antes de transicionar.
+ * comenzar nivel) y REINICIA el checkpoint al nivel 1 — es una partida
+ * NUEVA: descarta el nivel guardado de una tanda anterior (el récord vive
+ * aparte, en `lastScore`, y se conserva). `MenuScene` la invoca antes de
+ * transicionar a INTRO.
  */
 export function beginJourney(store: ProgressStore): void {
   store.setInProgress(true);
+  store.setCurrentLevel(1);
 }
 
 // ---- «Cómo jugar» (SPEC §6: leer → tocar → responder) ------------------------
